@@ -1,14 +1,14 @@
 # Aukey LT-T6
 
-This is a decent lamp with terrible controls and no smart features.
-As sold it has no remote or color control.
-It couldn't be dimmed at all in color mode and only had 3 brightness levels in white mode
+The Aukey LT-T6 is a decent lamp with terrible controls and no smart features.
+As sold it has no remote or color controls.
+It can not be dimmed at all in color mode and only has 3 brightness levels in white mode.
 
-If you're willing to pull out the control chip and solder 7 wires to its pads you can make it better.
-Any microcontroller or dev board would do, if it has 5 pins and could take 5V input power.
-It does not need to support 5V logic. I used an esp32-c3-mini. See [https://zi3.dev/](https://zi3.dev/) for details
+If you're willing to pull out the control chip and solder 7 wires to the exposed pads you can make it better.
+Any microcontroller or dev board will do, if it has 5 pins and can take 5V input power. It does not need to support 5V logic.
+I used an esp32-c3-mini. See [https://zi3.dev/](https://zi3.dev/) for details
 
-This is an esphome implementation of a better local touch interface and optional smart control via HomeAssistant
+This is an ESPHome implementation of a better local touch interface and optional smart control
 
 ## Touch Controls
 
@@ -40,7 +40,7 @@ To return to a higher brightness dim all the way to off. When next activated the
 Effects are disabled durning dimming to provide better feedback and avoid rapid color changes
 
 
-## Operation
+## Technical Operation
 
 #### Boot
 This configuration initalizes all outputs to off.
@@ -56,6 +56,6 @@ and publishes the touch sensor state.
 
 Remote and local control update the same global state, and can be used together.
 
-The lamp will run without any remote control configured, but when configured it has more controls available.
+The lamp will run without any remote control configured, but the one-button touch interface only exposes a few controls.
 
-I used HomeAssistant for remote control, but a similar configuration could interact with MQTT or another coordination systems.
+I used HomeAssistant for remote control, but a similar configuration could interact with MQTT or another coordination system.
