@@ -51,10 +51,11 @@ Once the software finishes booting the RGB output will be active at 50% brightne
 At boot the White brightness is set to 100% and OFF.
 
 #### Remote Control
-The lamp will run normally without any remote control configured, but when configured it has more controls available.
-
-I used HomeAssistant for remote control.
-A similar same esphome configuration could interact with MQTT or other coordination systems.
-
-This configuration defines dimmable RGBW outputs with seperate RGB and W lights,
+This ESPHome configuration defines dimmable RGBW outputs with seperate RGB and W lights,
 and publishes the touch sensor state.
+
+Remote and local control update the same global state, and can be used together.
+
+The lamp will run without any remote control configured, but when configured it has more controls available.
+
+I used HomeAssistant for remote control, but a similar configuration could interact with MQTT or another coordination systems.
