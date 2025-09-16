@@ -1,0 +1,59 @@
+# https://www.waveshare.com/wiki/ESP32-S3-Nano
+
+esp32:
+  board: esp32-s3-devkitc-1
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+
+light:
+  - platform: rgb
+    name: "RGB"
+    red: builtin_red
+    green: builtin_green
+    blue: builtin_blue
+  - platform: monochromatic
+    output: builtin_sck
+    name: "SCK"
+
+output:
+  - platform: ledc
+    id: builtin_sck
+    pin: GPIO48
+  - platform: ledc
+    id: builtin_blue
+    pin:
+      number: GPIO45
+      ignore_strapping_warning: true
+    inverted: True
+  - platform: ledc
+    id: builtin_red
+    pin:
+      number: GPIO46
+      ignore_strapping_warning: true
+    inverted: True
+  - platform: ledc
+    id: builtin_green
+    pin:
+      number: GPIO0
+      ignore_strapping_warning: true
+    inverted: True
+
+sensor:
+  - platform: internal_temperature
+    id: system_internal_temperature
+    name: Internal Temperature
+    icon: mdi:oil-temperature
+    update_interval: 300s
+    entity_category: diagnostic
+    device_class: "temperature"
+    unit_of_measurement: "°C"
+    disabled_by_default: true
+
+button:
+  - platform: restart
+    id: system_restart
+    name: Restart device
+    icon: mdi:reload
+    entity_category: config
+    disabled_by_default: true

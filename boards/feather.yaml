@@ -1,0 +1,41 @@
+# https://learn.adafruit.com/adafruit-esp32-feather-v2/pinouts
+
+esp32:
+  board: adafruit_feather_esp32_v2
+  framework:
+    type: esp-idf
+
+#spi:
+#  clk_pin: GPIO36
+#  mosi_pin: GPIO35
+#  miso_pin: GPIO37
+#  interface: hardware
+
+#i2c:
+#  sda: GPIO3
+#  scl: GPIO4
+
+switch:
+  - platform: gpio
+    name: "Builtin RGB Enable"
+    pin:
+      number: GPIO2
+      ignore_strapping_warning: true
+
+output:
+  - platform: ledc
+    id: builtin_red
+    pin: GPIO13
+
+light:
+  - platform: monochromatic
+    output: builtin_red
+    name: "Builtin Red"
+  - platform: esp32_rmt_led_strip
+    name: "Builtin RBG"
+    pin:
+      number: GPIO0
+      ignore_strapping_warning: true
+    chipset: WS2812
+    rgb_order: GRB
+    num_leds: 1
