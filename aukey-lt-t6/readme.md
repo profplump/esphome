@@ -43,19 +43,17 @@ Effects are disabled durning dimming to provide better feedback and avoid rapid 
 ## Technical Operation
 
 #### Boot
-This configuration initalizes all outputs to off.
-On many microcontrollers bootsrap pins may alter this initialization before the software starts.
-If the LED outputs are connected to these pins the lamp may light during this time.
-Once the software starts the White output will be off and the RGB output will be amber (red + green).
-Once the software finishes booting the RGB output will be active at 50% brightness with the "random" effect.
-At boot the White brightness is set to 100% and OFF.
+This configuration initalizes all outputs to OFF.
+Once the software starts the White output will be OFF and the RGB outputs will be amber (red + green).
+Once the software is finsihed booting:
+- RGB output will be ON at 50% brightness and runng the "random" effect
+- White output will be OFF at 100% brightness
 
 #### Remote Control
 This ESPHome configuration defines dimmable RGBW outputs with seperate RGB and W lights,
 and publishes the touch sensor state.
 
-Remote and local control update the same global state, and can be used together.
-
-The lamp will run without any remote control configured, but the one-button touch interface only exposes a few controls.
+Remote and local controls update the same global state, and can be used together.
+The lamp does not depend on remote control to operate, but the one-button touch interface only exposes a few controls.
 
 I used HomeAssistant for remote control, but a similar configuration could interact with MQTT or another coordination system.
