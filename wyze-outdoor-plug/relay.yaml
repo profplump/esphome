@@ -1,15 +1,37 @@
-# Lifted almost directly from:
+# Process and code mostly from:
 # https://devices.esphome.io/devices/Wyze-Outdoor-Plug
+# I added support for an at-boot default for each relay
 #
 # Build for:
 #  board: esp-wrover-kit
-# Use the labled pads on the board to flash
+# Use the labled pads on the main board to flash
 
 substitutions:
   # Higher value gives lower watt readout
   current_res: "0.001"
   # Lower value gives lower voltage readout
   voltage_div: "722"
+
+esphome:
+  on_boot:
+    - priority: -100
+      then:
+      - if:
+          condition:
+            - switch.is_on: relay1_boot
+          then:
+            - switch.turn_on: relay1
+      - if:
+          condition:
+            - switch.is_on: relay2_boot
+          then:
+            - switch.turn_on: relay2
+
+globals:
+   - id: relay1_default
+     type: bool
+   - id: relay2_default
+     type: bool
 
 switch:
   - platform: gpio
@@ -33,6 +55,26 @@ switch:
       - light.turn_on: relay2_led
     on_turn_off:
       - light.turn_off: relay2_led
+  - platform: template
+    name: Relay 1 State at Boot
+    id: relay1_boot
+    entity_category: config
+    restore_mode: RESTORE_DEFAULT_OFF
+    lambda: 'return id(relay1_default);'
+    turn_on_action:
+      - lambda: 'id(relay1_default) = true;'
+    turn_off_action:
+      - lambda: 'id(relay1_default) = false;'
+  - platform: template
+    id: relay2_boot
+    name: Relay 2 State at Boot
+    entity_category: config
+    restore_mode: RESTORE_DEFAULT_OFF
+    lambda: 'return id(relay2_default);'
+    turn_on_action:
+      - lambda: 'id(relay2_default) = true;'
+    turn_off_action:
+      - lambda: 'id(relay2_default) = false;'
 
 output:
   - platform: gpio
