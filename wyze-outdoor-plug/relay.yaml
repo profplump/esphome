@@ -1,6 +1,8 @@
-# Process and code mostly from:
+# Process and code mostly lifted from:
 # https://devices.esphome.io/devices/Wyze-Outdoor-Plug
-# I added support for an at-boot default for each relay
+# Added:
+#   Set default state for each relay at boot
+#   Enable/Disable local button control
 #
 # Build for:
 #  board: esp-wrover-kit
@@ -21,17 +23,22 @@ esphome:
             - switch.is_on: relay1_boot
           then:
             - switch.turn_on: relay1
+            - logger.log: 'Relay 1 Boot: On'
       - if:
           condition:
             - switch.is_on: relay2_boot
           then:
             - switch.turn_on: relay2
+            - logger.log: 'Relay 2 Boot: On'
 
 globals:
-   - id: relay1_default
-     type: bool
-   - id: relay2_default
-     type: bool
+  - id: relay1_default
+    type: bool
+  - id: relay2_default
+    type: bool
+  - id: local_control
+    type: bool
+    initial_value: "true"
 
 switch:
   - platform: gpio
@@ -63,8 +70,10 @@ switch:
     lambda: 'return id(relay1_default);'
     turn_on_action:
       - lambda: 'id(relay1_default) = true;'
+      - logger.log: 'Relay 1 Boot State: On'
     turn_off_action:
       - lambda: 'id(relay1_default) = false;'
+      - logger.log: 'Relay 1 Boot State: Off'
   - platform: template
     id: relay2_boot
     name: Relay 2 State at Boot
@@ -73,8 +82,22 @@ switch:
     lambda: 'return id(relay2_default);'
     turn_on_action:
       - lambda: 'id(relay2_default) = true;'
+      - logger.log: 'Relay 2 Boot State: On'
     turn_off_action:
       - lambda: 'id(relay2_default) = false;'
+      - logger.log: 'Relay 2 Boot State: Off'
+  - platform: template
+    id: local_control_switch
+    name: Local Control
+    entity_category: config
+    restore_mode: RESTORE_DEFAULT_ON
+    lambda: 'return id(local_control);'
+    turn_on_action:
+      - lambda: 'id(local_control) = true;'
+      - logger.log: 'Local Control: Enabled'
+    turn_off_action:
+      - lambda: 'id(local_control) = false;'
+      - logger.log: 'Local Control: Disabled'
 
 output:
   - platform: gpio
@@ -145,7 +168,11 @@ binary_sensor:
       mode: INPUT_PULLDOWN
       inverted: false
     on_press:
-      - switch.toggle: relay1
+      - if:
+          condition:
+            - lambda: 'return id(local_control);'
+          then:
+            - switch.toggle: relay1
   - platform: gpio
     name: Button 2
     pin:
@@ -153,7 +180,11 @@ binary_sensor:
       mode: INPUT_PULLDOWN
       inverted: false
     on_press:
-      - switch.toggle: relay2
+      - if:
+          condition:
+            - lambda: 'return id(local_control);'
+          then:
+          - switch.toggle: relay2
   - platform: template
     name: Daylight
     device_class: light

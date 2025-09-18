@@ -4,6 +4,7 @@ esp32:
   board: adafruit_feather_esp32_v2
   framework:
     type: esp-idf
+#!include esp32.yaml
 
 #spi:
 #  clk_pin: GPIO36

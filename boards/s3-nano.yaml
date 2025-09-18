@@ -5,6 +5,7 @@ esp32:
   flash_size: 16MB
   framework:
     type: esp-idf
+#!include esp32.yaml
 
 light:
   - platform: rgb
@@ -38,22 +39,3 @@ output:
       number: GPIO0
       ignore_strapping_warning: true
     inverted: True
-
-sensor:
-  - platform: internal_temperature
-    id: system_internal_temperature
-    name: Internal Temperature
-    icon: mdi:oil-temperature
-    update_interval: 300s
-    entity_category: diagnostic
-    device_class: "temperature"
-    unit_of_measurement: "°C"
-    disabled_by_default: true
-
-button:
-  - platform: restart
-    id: system_restart
-    name: Restart device
-    icon: mdi:reload
-    entity_category: config
-    disabled_by_default: true
