@@ -1,3 +1,10 @@
+substitutions:
+  esp32_framework_type: esp-idf
+
+esp32:
+  framework:
+    type: ${esp32_framework_type}
+
 sensor:
   - platform: internal_temperature
     id: system_internal_temperature

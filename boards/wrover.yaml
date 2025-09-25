@@ -1,5 +1,5 @@
 esp32:
   board: esp-wrover-kit
-  framework:
-    type: esp-idf
-#!include esp32.yaml
+
+packages:
+  esp32: !include esp32.yaml

@@ -1,10 +1,18 @@
-# https://learn.adafruit.com/adafruit-esp32-feather-v2/pinouts
+# Pinout source: https://learn.adafruit.com/adafruit-esp32-feather-v2/pinouts
+
+substitutions:
+  builtin_mono_name: "Builtin Mono"
+  builtin_mono_icon: mdi:head-lightbulb-outline
+  builtin_rgb_name: "Builtin RGB"
+  builtin_rgb_icon: mdi:head-lightbulb-outline
+  builtin_rgb_power_name: "${builtin_rgb_name} Enable"
+  builtin_rgb_power_icon: mdi:toggle-switch
 
 esp32:
   board: adafruit_feather_esp32_v2
-  framework:
-    type: esp-idf
-#!include esp32.yaml
+
+packages:
+  esp32: !include esp32.yaml
 
 #spi:
 #  clk_pin: GPIO36
@@ -18,7 +26,11 @@ esp32:
 
 switch:
   - platform: gpio
-    name: "Builtin RGB Enable"
+    id: builtin_rgb_power
+    name: ${builtin_rgb_power_name}
+    icon: ${builtin_rgb_power_icon}
+    restore_mode: ALWAYS_ON
+    entity_category: config
     pin:
       number: GPIO2
       ignore_strapping_warning: true
@@ -31,9 +43,13 @@ output:
 light:
   - platform: monochromatic
     output: builtin_red
-    name: "Builtin Red"
+    id: builtin_mono
+    name: ${builtin_mono_name}
+    icon: ${builtin_mono_icon}
   - platform: esp32_rmt_led_strip
-    name: "Builtin RBG"
+    id: builtin_rgb
+    name: ${builtin_rgb_name}
+    icon: ${builtin_rgb_icon}
     pin:
       number: GPIO0
       ignore_strapping_warning: true

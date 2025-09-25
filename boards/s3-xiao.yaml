@@ -1,0 +1,33 @@
+# Pinout source: https://wiki.seeedstudio.com/xiao_esp32s3_getting_started/
+
+substitutions:
+  builtin_mono_name: "Builtin Mono"
+  builtin_mono_icon: mdi:head-lightbulb-outline
+
+esp32:
+  board: esp32-s3-devkitc-1
+  flash_size: 8MB
+
+esphome:
+  platformio_options:
+    build_flags: -DBOARD_HAS_PSRAM
+    board_build.arduino.memory_type: qio_opi
+    board_build.f_flash: 80000000L
+    board_build.flash_mode: qio
+
+packages:
+  esp32: !include esp32.yaml
+
+output:
+  - platform: ledc
+    id: user_led
+    pin:
+      number: GPIO21
+      inverted: true
+
+light:
+  - platform: monochromatic
+    id: builtin_mono
+    name: ${builtin_mono_name}
+    icon: ${builtin_mono_icon}
+    output: user_led

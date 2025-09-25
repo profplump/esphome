@@ -1,0 +1,440 @@
+# Many things lifted from: https://devices.esphome.io/devices/Elegrp-RRR00-in-wall-outlet
+
+substitutions:
+  current_reference: 251213.46469622
+  voltage_reference: 15873.35944299
+  max_current: 15
+
+  relay1_restore: ALWAYS_ON
+  relay2_restore: ALWAYS_ON
+  relay1_boot_restore: RESTORE_DEFAULT_ON
+  relay2_boot_restore: RESTORE_DEFAULT_ON
+  local_restore: RESTORE_DEFAULT_ON
+  led_status_restore: RESTORE_DEFAULT_OFF
+
+  relay1_name: 'Upper'
+  relay1_icon: mdi:toggle-switch-variant
+  relay2_name: 'Lower'
+  relay2_icon: mdi:toggle-switch-variant
+
+# Backup access for hard-to-reach boards
+wifi:
+  ap:
+    ssid: ${name}
+    password: ${ap_key}
+# The captive_portal and web_server components fail on these outlets
+# The AP fires up but then we log this line and reboot:
+#   E [     64.364] failed to start task
+# Leave it enabled in the hope of future improvements
+captive_portal:
+
+bk72xx:
+  board: cbu
+
+globals:
+  - id: overload
+    type: bool
+    initial_value: "false"
+  - id: led_relay_status
+    type: bool
+  - id: local_control
+    type: bool
+  - id: relay1_default
+    type: bool
+  - id: relay2_default
+    type: bool
+
+# BL0942 on uart1 (P10 & P11, also used for flashing)
+uart:
+  id: uart_energy
+  rx_pin: RX1
+  tx_pin: TX1
+  baud_rate: 4800
+  stop_bits: 1
+# Log to uart2 (P6 & P7)
+logger:
+  hardware_uart: uart2
+
+esphome:
+  on_boot:
+    # Delay for other init but don't wait for WiFi
+    - priority: 400
+      then:
+      - delay: 1s
+      - if:
+          condition:
+            - switch.is_on: relay1_boot
+          then:
+            - switch.turn_on: relay1
+            - logger.log: 'Relay 2 Boot: On'
+      - if:
+          condition:
+            - switch.is_on: relay2_boot
+          then:
+            - switch.turn_on: relay2
+            - logger.log: 'Relay 1 Boot: On'
+
+
+# Flash the red light when things are bad
+status_led:
+  pin:
+    number: P20
+
+# Average 3 * 3 Hz readings, send 1 Hz updates
+.filter: &power_filters
+  filters:
+    - sliding_window_moving_average:
+        window_size: 3
+        send_every: 3
+        send_first_at: 3
+sensor:
+  - platform: bl0942
+    uart_id: uart_energy
+    update_interval: 0.333s
+    current_reference: ${current_reference}
+    voltage_reference: ${voltage_reference}
+    current:
+      id: current
+      name: 'Amps'
+      unit_of_measurement: A
+      accuracy_decimals: 2
+      <<: *power_filters
+      on_value_range:
+        - above: ${max_current}
+          then:
+          - globals.set:
+              id: overload
+              value: 'true'
+          - switch.turn_off: relay1
+          - switch.turn_off: relay2
+          - homeassistant.service:
+              service: persistent_notification.create
+              data:
+                title: "Outlet Overload"
+              data_template:
+                message: "${long_name} turned off because power exceeded ${max_current}A"
+    voltage:
+      id: voltage
+      name: 'Volts'
+      unit_of_measurement: V
+      accuracy_decimals: 1
+      <<: *power_filters
+    frequency:
+      id: frequency
+      name: 'Frequency'
+      accuracy_decimals: 3
+      <<: *power_filters
+    power:
+      name: 'Watts'
+      unit_of_measurement: W
+      accuracy_decimals: 0
+      <<: *power_filters
+    energy:
+      name: 'Energy'
+      accuracy_decimals: 3
+      <<: *power_filters
+
+binary_sensor:
+  # Buttons
+  # When local_control is true
+  #   Directly update relay state
+  # When local_control is false
+  #   Only send button state to API
+  - platform: gpio
+    id: button_upper
+    name: 'Button - ${relay1_name}'
+    pin:
+      number: P6
+      mode: INPUT_PULLUP
+      inverted: true
+    on_press:
+      - if:
+          condition:
+            - lambda: 'return id(local_control);'
+          then:
+            - switch.toggle: relay1
+  - platform: gpio
+    id: button_lower
+    name: 'Button - ${relay2_name}'
+    pin:
+      number: P8
+      mode: INPUT_PULLUP
+      inverted: true
+    on_press:
+      - if:
+          condition:
+            - lambda: 'return id(local_control);'
+          then:
+            - switch.toggle: relay2
+
+  # Overload
+  - platform: template
+    id: overload_sensor
+    name: Overload
+    icon: mdi:current-ac
+    lambda: 'return id(overload);'
+    entity_category: diagnostic
+
+output:
+  # libretiny_pwm exists but not on these pins
+  - platform: gpio
+    id: led1_output
+    pin: P14
+  - platform: gpio
+    id: led2_output
+    pin: P28
+
+  # When led_relay_status is true
+  #   Forbid API updates to light state
+  #   Sync light state to relay state 
+  # When led_relay_status is false
+  #   Sync output state to light state
+  - platform: template
+    id: light1_output
+    type: binary
+    write_action:
+      - if:
+          condition:
+            - lambda: 'return !id(led_relay_status);'
+          then:
+            - if:
+                condition:
+                  - lambda: 'return state;'
+                then:
+                  - output.turn_on: led1_output
+                else:
+                  - output.turn_off: led1_output
+          else:
+            - if:
+                condition:
+                  - switch.is_on: relay1
+                then:
+                  if:
+                    condition:
+                      - light.is_off: led1
+                    then:
+                      - light.turn_on: led1
+                else:
+                  if:
+                    condition:
+                      - light.is_on: led1
+                    then:
+                      - light.turn_off: led1
+  - platform: template
+    id: light2_output
+    type: binary
+    write_action:
+      - if:
+          condition:
+            - lambda: 'return !id(led_relay_status);'
+          then:
+            - if:
+                condition:
+                  - lambda: 'return state;'
+                then:
+                  - output.turn_on: led2_output
+                else:
+                  - output.turn_off: led2_output
+          else:
+            - if:
+                condition:
+                  - switch.is_on: relay2
+                then:
+                  if:
+                    condition:
+                      - light.is_off: led2
+                    then:
+                      - light.turn_on: led2
+                else:
+                  if:
+                    condition:
+                      - light.is_on: led2
+                    then:
+                      - light.turn_off: led2
+
+
+# Expose white LEDs as lights in the API
+light:
+  - platform: binary
+    id: led1
+    name: 'LED - ${relay1_name}'
+    output: light1_output
+  - platform: binary
+    id: led2
+    name: 'LED - ${relay2_name}'
+    output: light2_output
+
+switch:
+  # Relay 1
+  # Do not operate when overload is true
+  # Sync light state when led_relay_status is true
+  - platform: template
+    id: outlet1
+    name: 'Outlet - ${relay1_name}'
+    icon: ${relay1_icon}
+    restore_mode: ${relay1_restore}
+    lambda: 'return id(relay1).state;'
+    turn_on_action:
+      - if:
+          condition:
+            - lambda: 'return !id(overload);'
+          then:
+            - switch.turn_on: relay1
+          else:
+            - logger.log: 'Relay 1: Disabled by overload'
+    turn_off_action:
+      - switch.turn_off: relay1
+  - platform: gpio
+    id: relay1
+    internal: true
+    pin: P9
+    restore_mode: ${relay1_restore}
+    on_turn_on:
+      - if:
+          condition:
+            - lambda: 'return id(led_relay_status);'
+          then:
+            - light.turn_on: led1
+            - output.turn_on: led1_output
+    on_turn_off:
+      - if:
+          condition:
+            - lambda: 'return id(led_relay_status);'
+          then:
+            - light.turn_off: led1
+            - output.turn_off: led1_output
+
+  # Relay 2
+  - platform: template
+    id: outlet2
+    name: 'Outlet - ${relay2_name}'
+    icon: ${relay2_icon}
+    restore_mode: ${relay2_restore}
+    lambda: 'return id(relay2).state;'
+    turn_on_action:
+      - if:
+          condition:
+            - lambda: 'return !id(overload);'
+          then:
+            - switch.turn_on: relay2
+          else:
+            - logger.log: 'Relay 2: Disabled by overload'
+    turn_off_action:
+      - switch.turn_off: relay2
+  - platform: gpio
+    id: relay2
+    internal: true
+    pin: P7
+    restore_mode: ${relay1_restore}
+    on_turn_on:
+      - if:
+          condition:
+            - lambda: 'return id(led_relay_status);'
+          then:
+            - light.turn_on: led2
+            - output.turn_on: led2_output
+    on_turn_off:
+      - if:
+          condition:
+            - lambda: 'return id(led_relay_status);'
+          then:
+            - light.turn_off: led2
+            - output.turn_off: led2_output
+
+  # Button/LED Config
+  - platform: template
+    id: local_control_switch
+    name: Local Control
+    icon: mdi:toggle-switch
+    entity_category: config
+    restore_mode: ${local_restore}
+    lambda: 'return id(local_control);'
+    turn_on_action:
+      - lambda: 'id(local_control) = true;'
+      - logger.log: 'Local Control: Enabled'
+    turn_off_action:
+      - lambda: 'id(local_control) = false;'
+      - logger.log: 'Local Control: Disabled'
+  - platform: template
+    id: led_relay_status_switch
+    name: LEDs Show Outlet Status
+    icon: mdi:toggle-switch
+    entity_category: config
+    restore_mode: ${led_status_restore}
+    lambda: 'return id(led_relay_status);'
+    turn_on_action:
+      - lambda: 'id(led_relay_status) = true;'
+      - logger.log: 'LEDs show relay status: Enabled'
+      # Re-sync light states to relay states
+      - if:
+          condition:
+            - switch.is_on: relay1
+          then:
+            - light.turn_on: led1
+            - output.turn_on: led1_output
+          else:
+            - light.turn_off: led1
+            - output.turn_off: led1_output
+      - if:
+          condition:
+            - switch.is_on: relay2
+          then:
+            - light.turn_on: led2
+            - output.turn_on: led2_output
+          else:
+            - light.turn_off: led2
+            - output.turn_off: led2_output
+    turn_off_action:
+      - lambda: 'id(led_relay_status) = false;'
+      - logger.log: 'LEDs show relay status: Disabled'
+      - light.turn_off: led1
+      - light.turn_off: led2
+
+  # Boot Config
+  - platform: template
+    id: relay1_boot
+    name: ${relay1_name} State at Boot
+    icon: ${relay1_icon}
+    entity_category: config
+    restore_mode: ${relay1_boot_restore}
+    lambda: 'return id(relay1_default);'
+    turn_on_action:
+      - lambda: 'id(relay1_default) = true;'
+      - logger.log: 'Relay 1 Boot State: On'
+    turn_off_action:
+      - lambda: 'id(relay1_default) = false;'
+      - logger.log: 'Relay 1 Boot State: Off'
+  - platform: template
+    id: relay2_boot
+    name: ${relay2_name} State at Boot
+    icon: ${relay2_icon}
+    entity_category: config
+    restore_mode: ${relay2_boot_restore}
+    lambda: 'return id(relay2_default);'
+    turn_on_action:
+      - lambda: 'id(relay2_default) = true;'
+      - logger.log: 'Relay 2 Boot State: On'
+    turn_off_action:
+      - lambda: 'id(relay2_default) = false;'
+      - logger.log: 'Relay 2 Boot State: Off'
+
+# Allow API reset from overload
+button:
+  - platform: template
+    id: overload_reset
+    name: Reset Overload
+    entity_category: config
+    on_press:
+      - if:
+          condition:
+            # Only reset if the current is back down (or NaN)
+            - lambda: 'return (id(current).state < ${max_current}) || (id(current).state != id(current).state);'
+          then:
+            - logger.log: 'Overload reset'
+            - globals.set:
+                id: overload
+                value: 'false'
+          else:
+            - logger.log:
+                format: 'Overload reset failed. Current: %.1fA'
+                args: [ 'id(current).state' ]

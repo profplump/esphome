@@ -1,21 +1,31 @@
-# https://www.waveshare.com/wiki/ESP32-S3-Nano
+# Pinout source: https://www.waveshare.com/wiki/ESP32-S3-Nano
+
+substitutions:
+  builtin_rgb_name: "Builtin RGB"
+  builtin_rgb_icon: mdi:head-lightbulb-outline
+  builtin_mono_name: "Builtin Mono"
+  builtin_mono_icon: mdi:head-lightbulb-outline
 
 esp32:
   board: esp32-s3-devkitc-1
   flash_size: 16MB
-  framework:
-    type: esp-idf
-#!include esp32.yaml
+
+packages:
+  esp32: !include esp32.yaml
 
 light:
   - platform: rgb
-    name: "RGB"
+    id: builtin_rgb
+    name: ${builtin_rgb_name}
+    icon: ${builtin_rgb_icon}
     red: builtin_red
     green: builtin_green
     blue: builtin_blue
   - platform: monochromatic
+    id: builtin_mono
     output: builtin_sck
-    name: "SCK"
+    name: ${builtin_mono_name}
+    icon: ${builtin_mono_icon}
 
 output:
   - platform: ledc

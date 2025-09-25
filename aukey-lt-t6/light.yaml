@@ -1,3 +1,13 @@
+# Backup access for hard-to-reach boards
+wifi:
+  ap:
+    ssid: ${name}
+    password: !secret ap-light-kennel
+captive_portal:
+
+packages:
+    board: !include c3.yaml
+
 esphome:
   on_boot:
   # White off, RGB to amber @ early boot
@@ -36,8 +46,9 @@ binary_sensor:
   - platform: gpio
     id: touch
     name: "Touch"
+    icon: mdi:gesture-tap
     pin:
-      number: GPIO05
+      number: GPIO06
       inverted: true
     on_multi_click:
     - timing:
@@ -57,9 +68,9 @@ binary_sensor:
       then:
           # Disable current effect for better feedback while dimming
           # The lambda is equivalent to this yaml, but with a dynamic id
-          #- global.set:
+          #- globals.set:
           #    id: last_effect
-          #    value: !lambda return id(light_rgb).effect
+          #    value: !lambda return id(light_rgb).get_effect_name();
           #- light.control:
           #    id: light_rgb
           #    effect: none
@@ -78,7 +89,7 @@ binary_sensor:
               # The lambda is equivalent to this yaml, but with a dynamic id
               #- light.dim_relative:
               #    id: light_rgb
-              #    relative_brightness: -0.1%
+              #    relative_brightness: -1%
               #    transition_length: 0.1s
               - lambda: |-
                   esphome::light::LightState* light_id = (id(color_mode)) ? id(light_rgb) : id(light_white);
@@ -109,26 +120,26 @@ output:
   - platform: ledc
     id: lamp_white
     pin:
-      number: GPIO00
+      number: GPIO02
+      ignore_strapping_warning: true
 
   # Main RGB outputs
   - platform: ledc
     id: lamp_red
-    pin: GPIO01
+    pin: GPIO03
   - platform: ledc
     id: lamp_blue
-    pin:
-      number: GPIO02
-      ignore_strapping_warning: true
+    pin: GPIO04
   - platform: ledc
     id: lamp_green
-    pin: GPIO03
+    pin: GPIO05
 
 light:
   # Main white light
   - platform: monochromatic
     id: light_white
     name: "White"
+    icon: mdi:lamp-outline
     output: lamp_white
     restore_mode: ALWAYS_OFF
     default_transition_length: 1s
@@ -150,6 +161,7 @@ light:
   - platform: rgb
     id: light_rgb
     name: "RGB"
+    icon: mdi:lava-lamp
     red: lamp_red
     green: lamp_green
     blue: lamp_blue

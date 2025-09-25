@@ -1,8 +1,12 @@
 # IPv6 frequently causes the Ethernet component to fail at boot
-#network:
-#  enable_ipv6: true
+# So disable it unless someone higher demands it
+substitutions:
+  enable_ipv6: false
 
-# https://www.waveshare.com/wiki/ESP32-S3-ETH
+network:
+  enable_ipv6: ${enable_ipv6}
+
+# Pinout source: https://www.waveshare.com/wiki/ESP32-S3-ETH
 ethernet:
   type: W5500
   mosi_pin: GPIO11
@@ -25,3 +29,4 @@ text_sensor:
       icon: mdi:chip
       entity_category: diagnostic
       disabled_by_default: true
+

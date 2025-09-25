@@ -1,0 +1,20 @@
+# Pinout source: https://www.waveshare.com/wiki/ESP32-C3-Zero
+
+substitutions:
+  builtin_rgb_name: "Builtin RGB"
+  builtin_rgb_icon: mdi:head-lightbulb-outline
+
+packages:
+  c3: !include c3.yaml
+
+light:
+  - platform: esp32_rmt_led_strip
+    id: builtin_rgb
+    name: ${builtin_rgb_name}
+    icon: ${builtin_rgb_icon}
+    pin:
+      number: GPIO10
+    chipset: WS2812
+    rgb_order: RGB
+    num_leds: 1
+    disabled_by_default: true

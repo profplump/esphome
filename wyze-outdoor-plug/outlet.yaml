@@ -1,0 +1,14 @@
+substitutions:
+  name: esp32-outlet
+  long_name: Outlet
+  api_key: !secret api-outlet
+  ota_key: !secret ota-outlet
+  ap_key: !secret ap-outlet
+
+  # Override the defaults from wyze.yaml
+  relay1_name: "Garden Lights"
+  relay1_icon: mdi:string-lights
+
+packages:
+  wyze: !include wyze.yaml
+  base: !include base.yaml

@@ -1,0 +1,17 @@
+substitutions:
+  name: cbu-outlet
+  long_name: Outlet
+  api_key: !secret api-outlet-guest-vanity
+  ota_key: !secret ota-outlet-guest-vanity
+  ap_key: !secret ap-outlet-guest-vanity
+
+  # Override defaults from elegrp.yaml
+  relay1_restore: ALWAYS_OFF
+  relay2_restore: ALWAYS_OFF
+  relay1_boot_restore: RESTORE_DEFAULT_OFF
+  relay2_boot_restore: RESTORE_DEFAULT_OFF
+  local_restore: RESTORE_DEFAULT_OFF
+
+packages:
+  elegrp: !include elegrp.yaml
+  base: !include base.yaml

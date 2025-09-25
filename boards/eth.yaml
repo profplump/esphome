@@ -1,0 +1,22 @@
+# Pinout source: https://www.waveshare.com/wiki/ESP32-S3-ETH
+
+substitutions:
+  builtin_rgb_name: "Builtin RGB"
+  builtin_rgb_icon: mdi:head-lightbulb-outline
+
+esp32:
+  board: esp32-s3-devkitc-1
+  flash_size: 16MB
+
+packages:
+  esp32: !include esp32.yaml
+
+light:
+  - platform: esp32_rmt_led_strip
+    id: builtin_rgb
+    name: ${builtin_rgb_name}
+    icon: ${builtin_rgb_icon}
+    chipset: WS2812
+    pin: GPIO21
+    num_leds: 1
+    rgb_order: GRB
