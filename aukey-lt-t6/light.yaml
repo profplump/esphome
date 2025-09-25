@@ -6,7 +6,8 @@ wifi:
 captive_portal:
 
 packages:
-    board: !include c3.yaml
+  board: !include c3.yaml
+  base: !include base.yaml
 
 esphome:
   on_boot:
