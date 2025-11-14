@@ -5,8 +5,10 @@ substitutions:
   ota_key: !secret ota-light-guest-rgb
   ap_key: !secret ap-light-guest-rgb
 
-  # Sensor config
-  frequency_interval: 60s
+  # Lamp minimums in float-percent
+  red_min: 0.003262
+  blue_min: 0.002738
+  green_min: 0.002738
 
   # Name and icons for HA
   rgb_name: "RGB"
@@ -41,44 +43,59 @@ esphome:
 remote_receiver:
   # 433MHz RF
   pin:
-    number: GPIO02
+    number: GPIO07
     inverted: True
     mode: INPUT_PULLUP
+  filter: 200us
+  tolerance: 50%
+  idle: 4ms
   dump: rc_switch
 
-sensor:
-  # I'm not sure why this hardware has a zero-crossing input
-  # The original chip outputs much faster PWM and does not sync to ZC
-  # Derive a pulse-count frequency sensor since we have the hardware
-  - platform: pulse_meter
-    id: frequency
-    name: ${frequency_name}
-    icon: ${frequency_icon}
-    pin:
-      number: GPIO01
-      inverted: True
-    internal_filter: 3333us
-    timeout: 333ms
-    device_class: frequency
-    state_class: measurement
-    unit_of_measurement: Hz
-    accuracy_decimals: 2
-    # Convert from pulses/minute and coalesce
-    filters:
-      - multiply: 0.008333333333
-      - throttle_average: ${frequency_interval}
-
 output:
-  # Individual LED PWM outputs
+  # Red PWM & scaler
   - platform: ledc
+    id: led_red
+    pin: GPIO20
+  - platform: template
+    type: float
     id: lamp_red
-    pin: GPIO04
+    write_action: 
+      then:
+        - output.set_level:
+            id: led_red
+            level: !lambda |-
+              float k = (1.0f - ${red_min}f) / 0.99f;
+              return (state > 0.0f) ? (k * state) + ${red_min} : 0.0f;
+
+  # Blue PWM & scaler
   - platform: ledc
+    id: led_blue
+    pin: GPIO19
+  - platform: template
+    type: float
     id: lamp_blue
-    pin: GPIO03
+    write_action: 
+      then:
+        - output.set_level:
+            id: led_blue
+            level: !lambda |-
+              float k = (1.0f - ${blue_min}f) / 0.99f;
+              return (state > 0.0f) ? (k * state) + ${blue_min} : 0.0f;
+
+  # Green PWM & scaler
   - platform: ledc
+    id: led_green
+    pin: GPIO21
+  - platform: template
+    type: float
     id: lamp_green
-    pin: GPIO05
+    write_action: 
+      then:
+        - output.set_level:
+            id: led_green
+            level: !lambda |-
+              float k = ((1.0f - ${green_min}f) / 0.99f);
+              return (state > 0.0f) ? (k * state) + ${green_min} : 0.0f;
 
 light:
   # Main RGB light
