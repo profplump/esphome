@@ -1,0 +1,54 @@
+button:
+  - platform: template
+    name: 'On'
+    on_press:
+      - remote_transmitter.transmit_rc_switch_raw:
+  #Loopbk: data='010000011100010000000001'
+  #Remote: data='010000011100010000000001'
+          code: '0100000111000100000000011'
+          protocol: 1
+          repeat:
+            times: 3
+            wait_time: 10ms
+  - platform: template
+    name: 'Off'
+    on_press:
+      - remote_transmitter.transmit_rc_switch_raw:
+          code: '0100000111000100000001000'
+          protocol: 1
+  - platform: template
+    name: 'Bright Up'
+    on_press:
+      - remote_transmitter.transmit_rc_switch_raw:
+          code: '0100000111000100000000110'
+          protocol: 1
+  - platform: template
+    name: 'Bright Down'
+    on_press:
+      - remote_transmitter.transmit_rc_switch_raw:
+          code: '0100000111000100000000100'
+          protocol: 1
+  - platform: template
+    name: 'Flash'
+    on_press:
+      - remote_transmitter.transmit_rc_switch_raw:
+          code: '010000011100010000000101'
+          protocol: 1
+  - platform: template
+    name: 'Smooth'
+    on_press:
+      - remote_transmitter.transmit_rc_switch_raw:
+          code: '010000011100010000000110'
+          protocol: 1
+  - platform: template
+    name: 'Purple'
+    on_press:
+      - remote_transmitter.transmit_rc_switch_raw:
+          code: '010000011100010000010101'
+          protocol: 1
+  - platform: template
+    name: 'White'
+    on_press:
+      - remote_transmitter.transmit_rc_switch_raw:
+          code: '010000011100010000001110'
+          protocol: 1

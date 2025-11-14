@@ -1,0 +1,52 @@
+binary_sensor:
+  # RF Door/Window Sensor 1
+  - platform: remote_receiver
+    name: "Sensor 1 Open"
+    internal: yes
+    rc_switch_raw:
+      code: '101011100011001100001010'
+      protocol: 1
+    on_press:
+      - binary_sensor.template.publish:
+          id: Sensor1
+          state: ON
+  - platform: remote_receiver
+    name: "Sensor 2 Closed"
+    internal: yes
+    rc_switch_raw:
+      code: '101011100011001100001110'
+      protocol: 1
+    on_press:
+      - binary_sensor.template.publish:
+          id: Sensor1
+          state: OFF
+  - platform: template
+    id: Sensor1
+    name: "Sensor1 State"
+    device_class: window
+
+  # RF Door/Window Sensor 2
+  - platform: remote_receiver
+    name: "Sensor 2 Open"
+    internal: yes
+    rc_switch_raw:
+      code: '000111001110010000001010'
+      protocol: 2
+    on_press:
+      - binary_sensor.template.publish:
+          id: Sensor2
+          state: ON
+  - platform: remote_receiver
+    name: "Sensor 2 Closed"
+    internal: yes
+    rc_switch_raw:
+      code: '000111001110010000001110'
+      protocol: 2
+    on_press:
+      - binary_sensor.template.publish:
+          id: Sensor2
+          state: OFF
+  - platform: template
+    id: Sensor2
+    name: "Sensor2 State"
+    device_class: window

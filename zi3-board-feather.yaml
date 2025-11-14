@@ -1,0 +1,94 @@
+# Pinout source: https://learn.adafruit.com/adafruit-esp32-feather-v2/pinouts
+
+substitutions:
+  feather_board: adafruit_feather_esp32_v2
+
+  # Default I2C/NeoPixel power ON
+  feather_i2c_pixel_power_restore: ALWAYS_ON
+
+  # Battery config
+  feather_battery_interval: 60s
+
+  # Names and icons for HA
+  feather_mono_name: "Builtin Mono"
+  feather_mono_icon: mdi:head-lightbulb-outline
+  feather_rgb_name: "Builtin RGB"
+  feather_rgb_icon: mdi:head-lightbulb-outline
+  feather_button_name: "Builtin Button"
+  feather_button_icon: mdi:radiobox-marked
+  feather_battery_name: "Battery Voltage"
+  feather_battery_icon: mdi:sine-wave
+  feather_i2c_pixel_power_name: "I2C/NeoPixel Power"
+  feather_i2c_pixel_power_icon: mdi:power-settings
+
+packages:
+  wifi: !include zi3-wifi.yaml
+  esp32: !include zi3-board-esp32.yaml
+
+esp32:
+  board: ${feather_board}
+
+spi:
+  clk_pin:
+    number: GPIO05
+    ignore_strapping_warning: True
+  mosi_pin: GPIO19
+  miso_pin: GPIO21
+  interface: hardware
+
+i2c:
+  sda: GPIO22
+  scl: GPIO20
+
+output:
+  - platform: ledc
+    id: feather_red
+    pin: GPIO13
+
+binary_sensor:
+  - platform: gpio
+    id: feather_button
+    name: ${feather_button_name}
+    icon: ${feather_button_icon}
+    pin:
+      number: GPIO38
+      inverted: True
+
+sensor:
+  - platform: adc
+    pin: GPIO35
+    id: feather_battery
+    name: ${feather_battery_name}
+    update_interval: ${feather_battery_interval}
+    filters:
+      - multiply: 2.0
+    unit_of_measurement: V
+    accuracy_decimals: 2
+
+switch:
+  - platform: gpio
+    id: feather_i2c_pixel_power
+    name: ${feather_i2c_pixel_power_name}
+    icon: ${feather_i2c_pixel_power_icon}
+    restore_mode: ${feather_i2c_pixel_power_restore}
+    pin:
+      number: GPIO2
+      ignore_strapping_warning: True
+    disabled_by_default: True
+
+light:
+  - platform: monochromatic
+    id: feather_mono
+    name: ${feather_mono_name}
+    icon: ${feather_mono_icon}
+    output: feather_red
+  - platform: esp32_rmt_led_strip
+    id: feather_rgb
+    name: ${feather_rgb_name}
+    icon: ${feather_rgb_icon}
+    pin:
+      number: GPIO0
+      ignore_strapping_warning: True
+    chipset: WS2812
+    rgb_order: GRB
+    num_leds: 1

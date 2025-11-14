@@ -1,0 +1,11 @@
+substitutions:
+  ap_ssid: ${name}
+  ap_key: "${name}_111_222_333_444"
+  ap_timeout: 1min
+
+wifi:
+  ap:
+    ssid: ${ap_ssid}
+    password: ${ap_key}
+    ap_timeout: ${ap_timeout}
+captive_portal:

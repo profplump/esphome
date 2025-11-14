@@ -1,0 +1,26 @@
+substitutions:
+  # Automatically save to NVM this often
+  # Set to "never" if you do not want automatic saves
+  # Set to "0s" if you want to light your flash on fire
+  flash_write_interval: 1min
+
+  # Names and icons for HA
+  system_sync_name: "Save to Flash"
+  sytsem_sync_icon: mdi:content-save
+
+preferences:
+  flash_write_interval: ${flash_write_interval}
+
+# A button for manual syncing
+button:
+  - platform: template
+    id: system_sync
+    name: ${system_sync_name}
+    icon: ${sytsem_sync_icon}
+    entity_category: config
+    disabled_by_default: True
+    on_press:
+      - logger.log: ${system_sync_name}
+      - lambda: |-
+          using namespace preferences;
+          global_preferences->sync();

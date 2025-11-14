@@ -1,0 +1,27 @@
+# Pinout source: https://www.waveshare.com/wiki/ESP32-S3-ETH
+
+substitutions:
+  eth_board: esp32-s3-devkitc-1
+  eth_flash_size: 16MB
+  builtin_rgb_name: "Builtin RGB"
+  builtin_rgb_icon: mdi:head-lightbulb-outline
+
+packages:
+  esp32: !include zi3-board-esp32.yaml
+  eth: !include zi3-eth.yaml
+  # Only Ethernet or WiFi, not both
+  #wifi: !include zi3-wifi.yaml
+
+esp32:
+  board: ${eth_board}
+  flash_size: ${eth_flash_size}
+
+light:
+  - platform: esp32_rmt_led_strip
+    id: builtin_rgb
+    name: ${builtin_rgb_name}
+    icon: ${builtin_rgb_icon}
+    chipset: WS2812
+    pin: GPIO21
+    num_leds: 1
+    rgb_order: GRB

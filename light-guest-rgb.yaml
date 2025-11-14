@@ -1,0 +1,105 @@
+substitutions:
+  name: esp32-light-guest-rgb
+  friendly_name: Light - Guest - RGB
+  api_key: !secret api-light-guest-rgb
+  ota_key: !secret ota-light-guest-rgb
+  ap_key: !secret ap-light-guest-rgb
+
+  # Sensor config
+  frequency_interval: 60s
+
+  # Name and icons for HA
+  rgb_name: "RGB"
+  rgb_icon: mdi:lava-lamp
+  frequency_name: "Frequency"
+  frequency_icon: mdi:sine-wave
+
+packages:
+  ap: !include zi3-ap.yaml
+  base: !include zi3-base.yaml
+  board: !include zi3-board-c3-zero.yaml
+
+esphome:
+  on_boot:
+  # RGB to amber @ early boot
+  - priority: 600
+    then:
+      - light.turn_on:
+          id: light_rgb
+          brightness: 15%
+          red: 50%
+          blue: 0%
+          green: 25%
+          transition_length: 1s
+  # RGB to 100% (and trigger on_turn_on) @ boot complete
+  #- priority: -100
+  #  then:
+  #    - light.turn_on:
+  #        id: light_rgb
+  #        brightness: 100%
+
+remote_receiver:
+  # 433MHz RF
+  pin:
+    number: GPIO02
+    inverted: True
+    mode: INPUT_PULLUP
+  dump: rc_switch
+
+sensor:
+  # I'm not sure why this hardware has a zero-crossing input
+  # The original chip outputs much faster PWM and does not sync to ZC
+  # Derive a pulse-count frequency sensor since we have the hardware
+  - platform: pulse_meter
+    id: frequency
+    name: ${frequency_name}
+    icon: ${frequency_icon}
+    pin:
+      number: GPIO01
+      inverted: True
+    internal_filter: 3333us
+    timeout: 333ms
+    device_class: frequency
+    state_class: measurement
+    unit_of_measurement: Hz
+    accuracy_decimals: 2
+    # Convert from pulses/minute and coalesce
+    filters:
+      - multiply: 0.008333333333
+      - throttle_average: ${frequency_interval}
+
+output:
+  # Individual LED PWM outputs
+  - platform: ledc
+    id: lamp_red
+    pin: GPIO04
+  - platform: ledc
+    id: lamp_blue
+    pin: GPIO03
+  - platform: ledc
+    id: lamp_green
+    pin: GPIO05
+
+light:
+  # Main RGB light
+  - platform: rgb
+    id: light_rgb
+    name: ${rgb_name}
+    icon: ${rgb_icon}
+    red: lamp_red
+    green: lamp_green
+    blue: lamp_blue
+    restore_mode: ALWAYS_OFF
+    default_transition_length: 500ms
+    effects:
+      - random:
+          transition_length: 5s
+          update_interval: 7s
+      - pulse:
+      - strobe:
+      - flicker:
+    on_turn_on:
+      then:
+        - light.control:
+            id: light_rgb
+            effect: random

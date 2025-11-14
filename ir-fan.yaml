@@ -1,0 +1,23 @@
+substitutions:
+  name: esp8285-ir-fan
+  friendly_name: IR - Fan
+  api_key: !secret api-ir-test-mini
+  ota_key: !secret ota-ir-test-mini
+
+packages:
+  board: !include zi3-board-esp8285.yaml
+  base: !include zi3-base.yaml
+  fan: !include zi3-ir-fan.yaml
+
+remote_receiver:
+  id: ir_test_mini_rx
+  pin:
+    number: GPIO14
+    inverted: True
+    mode: INPUT_PULLUP
+  dump: all
+
+remote_transmitter:
+  id: ir_test_mini_tx
+  pin: GPIO4
+  carrier_duty_percent: 50%

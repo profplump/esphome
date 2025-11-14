@@ -1,0 +1,14 @@
+substitutions:
+  name: esp32-bt-front
+  friendly_name: BT - Front
+  api_key: !secret api-bt-proxy-front
+  ota_key: !secret ota-bt-proxy-front
+
+packages:
+  base: !include zi3-base.yaml
+  board: !include zi3-board-eth.yaml
+
+# Proxy
+bluetooth_proxy:
+  active: true
+  connection_slots: 3

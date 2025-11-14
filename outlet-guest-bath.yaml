@@ -1,0 +1,24 @@
+substitutions:
+  name: esp32-outlet-guest-bath
+  friendly_name: "Outlet - Guest - Bath"
+  api_key: !secret api-outlet-guest-bath
+  ota_key: !secret ota-outlet-guest-bath
+  ap_key: !secret ap-outlet-guest-bath
+
+  # Device-specifc sensor calibration
+  voltage_reference: 14000
+  current_reference: 253390
+  temp_ref_temperature: 308K
+  dimmer_gamma_correct: 1.0
+
+  # Guest room defaults to ON
+  relay1_boot_restore: RESTORE_DEFAULT_ON
+
+  # Names and icons for HA
+  relay1_name: GFCI Outlet
+  relay1_icon: mdi:power-socket-us
+
+packages:
+  ap: !include zi3-ap.yaml
+  base: !include zi3-base.yaml
+  shelly: !include zi3-switch-shelly.yaml

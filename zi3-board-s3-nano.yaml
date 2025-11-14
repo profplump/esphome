@@ -1,0 +1,54 @@
+# Pinout source: https://www.waveshare.com/wiki/ESP32-S3-Nano
+
+substitutions:
+  nano_board: esp32-s3-devkitc-1
+  nano_flash_size: 16MB
+  builtin_rgb_name: "Builtin RGB"
+  builtin_rgb_icon: mdi:head-lightbulb-outline
+  builtin_mono_name: "Builtin Mono"
+  builtin_mono_icon: mdi:head-lightbulb-outline
+
+packages:
+  esp32: !include zi3-board-esp32.yaml
+  wifi: !include zi3-wifi.yaml
+
+esp32:
+  board: ${nano_board}
+  flash_size: ${nano_flash_size}
+
+light:
+  - platform: rgb
+    id: builtin_rgb
+    name: ${builtin_rgb_name}
+    icon: ${builtin_rgb_icon}
+    red: builtin_red
+    green: builtin_green
+    blue: builtin_blue
+  - platform: monochromatic
+    id: builtin_mono
+    output: builtin_sck
+    name: ${builtin_mono_name}
+    icon: ${builtin_mono_icon}
+
+output:
+  - platform: ledc
+    id: builtin_sck
+    pin: GPIO48
+  - platform: ledc
+    id: builtin_blue
+    pin:
+      number: GPIO45
+      ignore_strapping_warning: True
+    inverted: True
+  - platform: ledc
+    id: builtin_red
+    pin:
+      number: GPIO46
+      ignore_strapping_warning: True
+    inverted: True
+  - platform: ledc
+    id: builtin_green
+    pin:
+      number: GPIO0
+      ignore_strapping_warning: True
+    inverted: True

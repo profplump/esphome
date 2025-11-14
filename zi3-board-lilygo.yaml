@@ -1,0 +1,105 @@
+# Many things lifted from: https://devices.esphome.io/devices/Lilygo-TDisplay-S3
+# Pinout from https://lilygo.cc/products/t-display-s3
+
+# You'll want something like this in your project
+#display:
+#  - platform: mipi_spi
+#    id: display1
+#    model: t-display-s3
+#    rotation: 270
+#    show_test_card: true
+
+substitutions:
+  button1_name: "Button 1"
+  button1_icon: mdi:radiobox-marked
+  button2_name: "Button 2"
+  button2_icon: ${button1_icon}
+
+  display_backlight_name: "Backlight"
+  display_backlight_icon: mdi:television-ambient-light
+  display_backlight_restore: ALWAYS_ON
+  display_backlight_transition: 100ms
+
+packages:
+  wifi: !include zi3-wifi.yaml
+  esp32: !include zi3-board-esp32.yaml
+
+esp32:
+  board: esp32-s3-devkitc-1
+  flash_size: 16MB
+
+psram:
+  speed: 80MHz
+  mode: octal
+
+#i2c:
+#  sda: GPIO17
+#  scl: GPIO18
+
+binary_sensor:
+  - platform: gpio
+    id: button1
+    name: ${button1_name}
+    icon: ${button1_icon}
+    pin:
+      number: GPIO00
+      ignore_strapping_warning: True
+      inverted: True
+  - platform: gpio
+    id: button2
+    name: ${button2_name}
+    icon: ${button2_icon}
+    pin:
+      number: GPIO14
+      inverted: True
+
+output:
+  - platform: ledc
+    id: display1_backlight_output
+    pin: GPIO38
+    frequency: 2000
+
+light:
+  - platform: monochromatic
+    id: display1_backlight
+    name: ${display_backlight_name}
+    icon: ${display_backlight_icon}
+    output: display1_backlight_output
+    restore_mode: ${display_backlight_restore}
+    default_transition_length: ${display_backlight_transition}
+
+spi:
+  type: octal
+  clk_pin: 8
+  data_pins:
+    - 39
+    - 40
+    - 41
+    - 42
+    - ignore_strapping_warning: True
+      number: 45
+    - ignore_strapping_warning: True
+      number: 46
+    - 47
+    - 48
+
+# If you have the touchscreen model
+#touchscreen:
+#  - platform: cst816
+#    id: screen1_touch
+#    name: ${touchscreen_name}
+#    icon: ${touchscreen_icon}
+#    interrupt_pin: GPIO16
+#    reset_pin: GPIO21
+
+# The cst816 can also report mapped touch areas as a binary_sensor
+#binary_sensor:
+#  - platform: touchscreen
+#    id: touch_button1
+#    name: ${touch_button1_name}
+#    icon: ${touch_button1_icon}
+#    x_min: 0
+#    x_max: 100
+#    y_min: 0
+#    y_max: 100
+#    use_raw: true

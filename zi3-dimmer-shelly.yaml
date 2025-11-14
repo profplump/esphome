@@ -1,0 +1,426 @@
+# Pinout from: https://templates.blakadder.com/shelly_Dimmer_2.html
+#
+# GPIO00	(Exposed on header)
+# GPIO01	SMT Tx
+# GPIO03	SMT Rx
+# GPIO04	Boot 0
+# GPIO05	Reset
+# GPIO12	SW2 input
+# GPIO14	SW1 input
+# GPIO16	LED
+# GPIO17	NTC Sensor
+
+substitutions:
+  # Sensor calibration, varies by device
+  voltage_scalar: 1.0
+  current_scalar: 1.0
+  voltage_offset: 0.0
+  current_offset: 0.0
+
+  # Shelly Dimmer uses an ESP8286 so we need flash to store preferences
+  restore_from_flash: True
+
+  # True = leading edge dimming, False = trailing edge dimming
+  leading_edge: "false"
+
+  # SMT config
+  smt_version: "51.7"
+  # This only needs to be True on first (AC-powered) run
+  smt_update: False
+
+  # Init dimmer to OFF, 1s transitions, 6s updates
+  dimmer_restore: ALWAYS_OFF
+  dimmer_transition: 1s
+  dimmer_interval: 1s
+  dimmer_interval_filter: 6
+  dimmer_gamma_correct: 2.8
+  # Require ~2s @ 1Hz of overload samples to trigger
+  current_limit_samples: 2
+
+  # Minimum, maximum, and warmup dimmer brightness settings
+  dimmer_min: "0"
+  dimmer_max: "1000"
+  dimmer_step: "1"
+  dimmer_min_default: ${dimmer_min}
+  dimmer_max_default: ${dimmer_max}
+  dimmer_warmup_default: "100"
+
+  # If measured voltage is below this threshold we have no neutral
+  neutral_threshold: 50
+
+  # zi3-shelly-temp.yaml
+  # Override the NTC temp sensor pin
+  temp_pin: A0
+  # Override the current ranges
+  current_min: "0.0"
+  current_max: "1.1"
+  current_limit_default: ${current_max}
+
+  # Updates take effect immediately, but only get saved occasionally
+  flash_write_interval: 15min
+
+  # Names and icons used in HA
+  dimmer_name: "Dimmer"
+  dimmer_icon: mdi:lightbulb-on-60
+  switch1_name: "Switch 1"
+  switch1_icon: mdi:electric-switch
+  switch2_name: "Switch 2"
+  switch2_icon: ${switch1_icon}
+
+  # Sensor names and icons
+  voltage_name: "Voltage"
+  voltage_icon: mdi:sine-wave
+  current_name: "Current"
+  current_icon: mdi:current-ac
+  power_name: "Power"
+  power_icon: mdi:flash
+  energy_name: "Energy"
+  energy_icon: mdi:lightning-bolt
+  neutral_name: "Neutral Present"
+  neutral_icon: mdi:electric-switch-closed
+  smt_name: "SMT Version"
+  smt_icon: mdi:numeric
+
+  # Config names and icons
+  dimmer_min_name: "Minimum Brightness"
+  dimmer_min_icon: mdi:vector-point-select
+  dimmer_max_name: "Maximum Brightness"
+  dimmer_max_icon: ${dimmer_min_icon}
+  dimmer_warmup_name: "Warmup Brightness"
+  dimmer_warmup_icon: ${dimmer_min_icon}
+  leading_edge_name: "Leading Edge"
+  leading_edge_icon: mdi:square-wave
+
+packages:
+  board: !include zi3-board-esp8285.yaml
+  nvm: !include zi3-nvm.yaml
+  temp: !include zi3-shelly-temp.yaml
+  current: !include zi3-current.yaml
+
+# AC control via the SMT on UART1
+uart:
+  tx_pin: 1
+  rx_pin: 3
+  baud_rate: 115200
+
+# Disable UART logging
+logger:
+  baud_rate: 0
+
+globals:
+  - id: leading_edge
+    type: bool
+    initial_value: ${leading_edge}
+    restore_value: True
+  - id: dimmer_min
+    type: int
+    initial_value: ${dimmer_min_default}
+    restore_value: True
+  - id: dimmer_max
+    type: int
+    initial_value: ${dimmer_max_default}
+    restore_value: True
+  - id: dimmer_warmup
+    type: int
+    initial_value: ${dimmer_warmup_default}
+    restore_value: True
+
+# Do this when an overload is triggered
+# Called from zi3-shelly-temp/zi3-current
+script:
+  - id: overload_script
+    then:
+      - light.turn_off: dimmer
+
+# Flash the red light when things are bad
+status_led:
+  pin:
+    number: GPIO16
+    inverted: True
+
+binary_sensor:
+  # GPIO00 is exposed on the external header
+  # Is the builtin button on GPIO02?
+  - platform: gpio
+    id: header00
+    name: "Header GPIO00"
+    pin:
+      number: GPIO00
+      mode: INPUT
+    internal: True
+  # Screw terminals labeled SW1 and SW2
+  - platform: gpio
+    id: switch1
+    name: ${switch1_name}
+    icon: ${switch1_icon}
+    pin:
+      number: GPIO14
+      mode: INPUT
+    filters:
+      delayed_on_off: 25ms
+  - platform: gpio
+    id: switch2
+    name: ${switch2_name}
+    icon: ${switch2_icon}
+    pin:
+      number: GPIO12
+      mode: INPUT
+    filters:
+      delayed_on_off: 25ms
+
+  # Detect neutral vs inline installs
+  - platform: template
+    id: neutral_present
+    name: ${neutral_name}
+    icon: ${neutral_icon}
+    entity_category: diagnostic
+    lambda: 'return (id(voltage).state > ${neutral_threshold});'
+    disabled_by_default: True
+
+.filter: &power_filters
+  - sliding_window_moving_average:
+      window_size: ${dimmer_interval_filter}
+      send_every: ${dimmer_interval_filter}
+      send_first_at: ${dimmer_interval_filter}
+light:
+  # Dimmer and integral (SMT) sensors
+  - platform: shelly_dimmer
+    id: dimmer
+    output_id: dimmer_ref
+    update_interval: ${dimmer_interval}
+    name: ${dimmer_name}
+    icon: ${dimmer_icon}
+    gamma_correct: ${dimmer_gamma_correct}
+    leading_edge: ${leading_edge}
+    min_brightness: ${dimmer_min}
+    max_brightness: ${dimmer_max}
+    warmup_brightness: ${dimmer_warmup_default}
+    restore_mode: ${dimmer_restore}
+    default_transition_length: ${dimmer_transition}
+    firmware:
+      version: "${smt_version}"
+      update: ${smt_update}
+    voltage:
+      id: voltage
+      name: ${voltage_name}
+      icon: ${voltage_icon}
+      filters:
+        - multiply: ${voltage_scalar}
+        - offset: ${voltage_offset}
+        - <<: *power_filters
+    current:
+      id: current
+      name: ${current_name}
+      icon: ${current_icon}
+      filters:
+        - multiply: ${current_scalar}
+        - offset: ${current_offset}
+        - <<: *power_filters
+      on_raw_value:
+        then:
+          !include zi3-current-tmpl.yaml
+    power:
+      id: power
+      name: ${power_name}
+      icon: ${power_icon}
+      filters:
+        # Force power to 0 when we have no neutral
+        - multiply: !lambda 'return (id(neutral_present) ? 1.0 : 0.0);'
+        - <<: *power_filters
+    on_state:
+      then:
+        - if:
+            # Refuse to stay on when any overload is active
+            condition:
+              - lambda: 'return (id(current_overload) || id(temp_overload));'
+              - light.is_on: dimmer
+            then:
+              - light.control:
+                  id: dimmer
+                  state: OFF
+                  transition_length: 0s
+              - logger.log: "${dimmer_name}: Disabled by overload"
+
+sensor:
+  # Synthesize an energy reading
+  - platform: integration
+    id: energy
+    name: ${energy_name}
+    icon: ${energy_icon}
+    sensor: power
+    time_unit: h
+    unit_of_measurement: kWh
+    filters:
+      - multiply: 0.001
+    accuracy_decimals: 3
+    device_class: energy
+    state_class: total_increasing
+
+  # Expose our numeric constants to the API
+  - platform: template
+    id: smt_version
+    name: ${smt_name}
+    icon: ${smt_icon}
+    lambda: 'return ${smt_version};'
+    entity_category: diagnostic
+    update_interval: 24h
+    accuracy_decimals: 1
+    disabled_by_default: True
+  - platform: template
+    id: current_scalar
+    name: "${current_name} Scalar"
+    icon: ${current_icon}
+    lambda: 'return ${current_scalar};'
+    entity_category: diagnostic
+    update_interval: 24h
+    accuracy_decimals: 1
+    disabled_by_default: True
+  - platform: template
+    id: voltage_scalar
+    name: "${voltage_name} Scalar"
+    icon: ${voltage_icon}
+    lambda: 'return ${voltage_scalar};'
+    entity_category: diagnostic
+    update_interval: 24h
+    accuracy_decimals: 1
+    disabled_by_default: True
+  - platform: template
+    id: current_offset
+    name: "${current_name} Offset"
+    icon: ${current_icon}
+    lambda: 'return ${current_offset};'
+    entity_category: diagnostic
+    update_interval: 24h
+    accuracy_decimals: 1
+    disabled_by_default: True
+  - platform: template
+    id: voltage_offset
+    name: "${voltage_name} Offset"
+    icon: ${voltage_icon}
+    lambda: 'return ${voltage_offset};'
+    entity_category: diagnostic
+    update_interval: 24h
+    accuracy_decimals: 1
+    disabled_by_default: True
+
+number:
+  # API min/max/warmup brightness
+  - platform: template
+    id: min_brightness_input
+    name: ${dimmer_min_name}
+    icon: ${dimmer_min_icon}
+    entity_category: config
+    min_value: ${dimmer_min}
+    max_value: ${dimmer_max}
+    step: ${dimmer_step}
+    lambda: |-
+      if (id(dimmer_min) < ${dimmer_min} || id(dimmer_min) >= id(dimmer_max)) {
+        int x = std::min(${dimmer_min_default}, id(dimmer_max) - ${dimmer_step});
+        ESP_LOGE("zi3-dimmer-shelly", "${dimmer_min_name}: Resetting from %.0f to %.0f", id(dimmer_min), x);
+        id(dimmer_min) = x;
+        id(min_brightness_input).publish_state(id(dimmer_min));
+      }
+      return id(dimmer_min);
+    set_action:
+      then:
+        - lambda: |-
+            id(dimmer_min) = x;
+            id(dimmer_ref).set_min_brightness(id(dimmer_min));
+            id(dimmer_ref).setup();
+            id(min_brightness_input).publish_state(id(dimmer_min));
+        - logger.log:
+            format: "${dimmer_min_name}: %.0f"
+            args: [ 'id(dimmer_min)' ]
+  - platform: template
+    id: max_brightness_input
+    name: ${dimmer_max_name}
+    icon: ${dimmer_max_icon}
+    entity_category: config
+    min_value: ${dimmer_min}
+    max_value: ${dimmer_max}
+    step: ${dimmer_step}
+    lambda: |-
+      if (id(dimmer_max) > ${dimmer_max} || id(dimmer_max) <= id(dimmer_min)) {
+        int x = std::max(${dimmer_max_default}, id(dimmer_min) + ${dimmer_step});
+        ESP_LOGE("zi3-dimmer-shelly", "${dimmer_max_name}: Resetting from %.0f to %.0f", id(dimmer_max), x);
+        id(dimmer_max) = x;
+        id(max_brightness_input).publish_state(id(dimmer_max));
+      }
+      return id(dimmer_max);
+    set_action:
+      then:
+        - lambda: |-
+            id(dimmer_max) = x;
+            id(dimmer_ref).set_max_brightness(id(dimmer_max));
+            id(dimmer_ref).setup();
+            id(max_brightness_input).publish_state(id(dimmer_max));
+        - logger.log:
+            format: "${dimmer_max_name}: %.0f"
+            args: [ 'id(dimmer_max)' ]
+  - platform: template
+    id: warmup_brightness_input
+    name: ${dimmer_warmup_name}
+    icon: ${dimmer_warmup_icon}
+    entity_category: config
+    min_value: ${dimmer_min}
+    max_value: ${dimmer_max}
+    step: ${dimmer_step}
+    lambda: |-
+      if (id(dimmer_warmup) > ${dimmer_max} || id(dimmer_warmup) < ${dimmer_min}) {
+        ESP_LOGE("zi3-dimmer-shelly", "${dimmer_warmup_name}: Resetting from %.0f to %.0f", id(dimmer_warmup), ${dimmer_warmup_default});
+        id(dimmer_warmup) = ${dimmer_warmup_default};
+        id(warmup_brightness_input).publish_state(id(dimmer_warmup));
+      }
+      return id(dimmer_warmup);
+    set_action:
+      then:
+        - lambda: |-
+            id(dimmer_warmup) = x;
+            id(dimmer_ref).set_warmup_brightness(id(dimmer_warmup));
+            id(dimmer_ref).setup();
+            id(warmup_brightness_input).publish_state(id(dimmer_warmup));
+        - logger.log:
+            format: "${dimmer_warmup_name}: %.0f"
+            args: [ 'id(dimmer_warmup)' ]
+
+# API leading edge switch
+switch:
+  - platform: template
+    id: leading_edge_input
+    name: ${leading_edge_name}
+    icon: ${leading_edge_icon}
+    entity_category: config
+    lambda: 'return id(leading_edge);'
+    turn_on_action:
+      then:
+        - lambda: |-
+            id(leading_edge) = true;
+            id(dimmer_ref).set_leading_edge(id(leading_edge));
+            id(dimmer_ref).setup();
+            ESP_LOGD("zi3-dimmer-shelly", "${leading_edge_name}: %s", ONOFF(id(leading_edge)));
+            id(leading_edge_input).publish_state(id(leading_edge));
+    turn_off_action: 
+      then:
+        - lambda: |-
+            id(leading_edge) = false;
+            id(dimmer_ref).set_leading_edge(id(leading_edge));
+            id(dimmer_ref).setup();
+            ESP_LOGD("zi3-dimmer-shelly", "${leading_edge_name}: %s", ONOFF(id(leading_edge)));
+            id(leading_edge_input).publish_state(id(leading_edge));
+
+# Restored saved config at boot
+esphome:
+  on_boot: 
+    # Delay for some init (plus 500ms) but don't wait for WiFi/API
+    - priority: 400
+      then:
+        - delay: 500ms
+        - lambda: |-
+            id(dimmer_ref).set_min_brightness(id(dimmer_min));
+            id(dimmer_ref).set_max_brightness(id(dimmer_max));
+            id(dimmer_ref).set_warmup_brightness(id(dimmer_warmup));
+            id(dimmer_ref).set_leading_edge(id(leading_edge));
+            id(dimmer_ref).setup();
+            ESP_LOGD("zi3-dimmer-shelly",
+              "Config restored:\n\tMin: %.0f\n\tMax %.0f\n\tWarmup: %.0f\n\tLeading Edge: %s",
+              id(dimmer_min), id(dimmer_max), id(dimmer_warmup), ONOFF(id(leading_edge)));

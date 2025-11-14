@@ -1,0 +1,16 @@
+substitutions:
+  name: cbu-outlet-office-bench
+  friendly_name: Outlet - Office - Bench
+  api_key: !secret api-outlet-office-bench
+  ota_key: !secret ota-outlet-office-bench
+  ap_key: !secret ap-outlet-office-bench
+
+  # Device-specifc sensor calibration
+  voltage_reference: 15930
+  current_reference: 253390
+  #wifi_ssid: "no_such_network"
+
+packages:
+  ap: !include zi3-ap.yaml
+  base: !include zi3-base.yaml
+  outlet: !include zi3-outlet-elegrp.yaml

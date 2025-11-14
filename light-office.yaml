@@ -1,0 +1,22 @@
+substitutions:
+  name: esp8285-light-office
+  friendly_name: "Light - Office"
+  api_key: !secret api-light-office
+  ota_key: !secret ota-light-office
+  ap_key: !secret ap-light-office
+
+  # Device-specific calibration
+  dimmer_min_default: "225"
+  current_limit_default: "0.5"
+  current_scalar: 1.0
+  voltage_scalar: 1.0
+  dimmer_gamma_correct: 3.2
+
+  # Names and icons
+  dimmer_name: "Globe"
+  dimmer_icon: mdi:globe-light-outline
+
+packages:
+  ap: !include zi3-ap.yaml
+  base: !include zi3-base.yaml
+  shelly: !include zi3-dimmer-shelly.yaml

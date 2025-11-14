@@ -1,0 +1,38 @@
+substitutions:
+  name: esp32-test-display
+  friendly_name: Test Display
+  api_key: !secret api-test-display
+  ota_key: !secret ota-test-display
+
+packages:
+  base: !include zi3-base.yaml
+  board: !include zi3-board-lilygo.yaml
+
+time:
+  - platform: homeassistant
+    id: ha_time
+    timezone: America/Los_Angeles
+    on_time_sync:
+      then:
+        - logger.log:
+            format: "Got time: %s"
+            args: ['id(ha_time).now().timestamp']
+
+font:
+  - file: "Roboto-Regular.ttf"
+    id: roboto_60
+    size: 60
+
+display:
+  - platform: mipi_spi
+    id: display1
+    model: t-display-s3
+    rotation: 270
+    show_test_card: true
+    lambda: |-
+      if (id(ha_time).now().is_valid()) {
+        it.strftime(0, 0, id(roboto_60), "%Y-%m-%d", id(ha_time).now());
+        it.strftime(0, 60, id(roboto_60), "%H:%M:%S", id(ha_time).now());
+      } else {
+        it.print(0, 0, id(roboto_60), "No Time");
+      }

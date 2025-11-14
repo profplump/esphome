@@ -1,0 +1,21 @@
+substitutions:
+  name: esp32-outlet-outside
+  friendly_name: Outlet - Outside
+  api_key: !secret api-outlet-outside
+  ota_key: !secret ota-outlet-outside
+  ap_key: !secret ap-outlet-outside
+
+  # Device-specific calibration
+  current_resistor: 0.001316136114
+  voltage_divider: 720
+
+  # Names and icons for HA
+  relay1_name: "Garden Lights"
+  relay1_icon: mdi:string-lights
+  relay2_name: "Unicorn"
+  relay2_icon: mdi:horse
+
+packages:
+  ap: !include zi3-ap.yaml
+  base: !include zi3-base.yaml
+  wyze: !include zi3-outlet-wyze.yaml

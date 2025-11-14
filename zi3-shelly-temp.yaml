@@ -1,0 +1,191 @@
+substitutions:
+  # Overload thresholds (and input ranges)
+  temp_min: "20.0"
+  temp_max: "70.0"
+  temp_step: "5"
+  temp_limit_default: ${temp_max}
+
+  # Sensor names and icons
+  temp_name: "Temperature"
+  temp_icon: mdi:coolant-temperature
+  temp_overload_name: "Overload - ${temp_name}"
+  temp_overload_icon: mdi:alert-octagon
+
+  # Config names and icons
+  temp_limit_name: "${temp_name} Limit"
+  temp_limit_icon: ${temp_icon}
+
+  # NTC sensor config
+  temp_pin: GPIO3
+  temp_resistor: 32kOhm
+  temp_configuration: DOWNSTREAM
+  temp_b_constant: 3350
+  temp_ref_resistance: 10kOhm
+  temp_ref_temperature: 298.15K
+
+  # Reduce temp_interval to get faster overload triggers
+  # Increase temp_interval_filter to send fewer update to HA
+  temp_interval: 1s
+  temp_interval_filter: 60
+
+globals:
+  - id: temp_overload
+    type: bool
+    initial_value: "false"
+  - id: temp_limit
+    type: float
+    initial_value: ${temp_limit_default}
+    restore_value: True
+
+binary_sensor:
+  - platform: template
+    id: temp_overload_sensor
+    name: ${temp_overload_name}
+    icon: ${temp_overload_icon}
+    lambda: 'return id(temp_overload);'
+    entity_category: diagnostic
+
+sensor:
+  # NTC temperature sensor
+  - platform: adc
+    id: ntc_voltage
+    pin: ${temp_pin}
+    update_interval: ${temp_interval}
+    internal: True
+  - platform: resistance
+    id: ntc_resistance
+    sensor: ntc_voltage
+    configuration: ${temp_configuration}
+    resistor: ${temp_resistor}
+    internal: True
+  - platform: ntc
+    id: temperature
+    name: ${temp_name}
+    icon: ${temp_icon}
+    sensor: ntc_resistance
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+    calibration:
+      b_constant: ${temp_b_constant}
+      reference_resistance: ${temp_ref_resistance}
+      reference_temperature: ${temp_ref_temperature}
+    filters:
+      - sliding_window_moving_average:
+          window_size: ${temp_interval_filter}
+          send_every: ${temp_interval_filter}
+          send_first_at: ${temp_interval_filter}
+    on_raw_value:
+      then:
+        - if:
+            condition:
+                - lambda: |-
+                    return (
+                      (!id(temp_overload)) && // temp_overload not set
+                      (x > id(temp_limit))    // This reading exceeds temp_limit
+                    );
+            then:
+              - lambda: |-
+                  id(temp_overload) = true;
+                  id(temp_overload_sensor).publish_state(id(temp_overload));
+              - logger.log:
+                  format: "${temp_overload_name}: %.1f°C reading / %.1f°C limit"
+                  args: [ 'x', 'id(temp_limit)' ]
+              - script.execute: overload_script
+
+  # Expose our numeric constants to the API
+  - platform: template
+    id: temp_min
+    name: "Minimum ${temp_name} Limit"
+    lambda: 'return ${temp_min};'
+    entity_category: diagnostic
+    update_interval: 24h
+    disabled_by_default: True
+  - platform: template
+    id: temp_max
+    name: "Maximum ${temp_name} Limit"
+    lambda: 'return ${temp_max};'
+    entity_category: diagnostic
+    update_interval: 24h
+    disabled_by_default: True
+  - platform: template
+    id: temp_limit_default
+    name: "Default ${temp_name} Limit"
+    lambda: 'return ${temp_limit_default};'
+    entity_category: diagnostic
+    update_interval: 24h
+    disabled_by_default: True
+  - platform: template
+    id: temp_b_constant
+    name: "β Constant"
+    lambda: 'return ${temp_b_constant};'
+    entity_category: diagnostic
+    update_interval: 24h
+    disabled_by_default: True
+
+text_sensor:
+  # Expose our pre-unit-ed constants to the API
+  - platform: template
+    id: temp_ref_resistance
+    name: "Reference Resistance"
+    lambda: 'return {"${temp_ref_resistance}"};'
+    entity_category: diagnostic
+    update_interval: 24h
+    disabled_by_default: True
+  - platform: template
+    id: temp_ref_temperature
+    name: "Reference ${temp_name}"
+    lambda: 'return {"${temp_ref_temperature}"};'
+    entity_category: diagnostic
+    update_interval: 24h
+    disabled_by_default: True
+
+number:
+  # API temp limit
+  - platform: template
+    id: temp_limit_input
+    name: ${temp_limit_name}
+    icon: ${temp_limit_icon}
+    lambda: 'return id(temp_limit);'
+    entity_category: config
+    unit_of_measurement: "°C"
+    disabled_by_default: True
+    min_value: ${temp_min}
+    max_value: ${temp_max}
+    step: ${temp_step}
+    set_action:
+      then:
+        - lambda: |-
+            id(temp_limit) = x;
+            id(temp_limit_input).publish_state(id(temp_limit));
+        - logger.log:
+            format: "${temp_limit_name}: %.2f"
+            args: [ 'id(temp_limit)' ]
+
+# API reset from overload
+button:
+  - platform: template
+    id: temp_overload_reset
+    name: "Reset ${temp_overload_name}"
+    icon: ${temp_overload_icon}
+    entity_category: config
+    on_press:
+      - if:
+          condition:
+            - lambda: |-
+                return (
+                  (std::isnan(id(temperature).state))      || // Temperature is not valid
+                  (id(temperature).state <= id(temp_limit))   // Temperature does not exceed temp_limit
+                );
+          then:
+            - if:
+                condition:
+                  - lambda: 'return id(temp_overload);'
+                then:
+                  - logger.log: "${temp_overload_name}: Reset successful"
+                  - lambda: 'id(temp_overload) = false;'
+                else:
+                  - logger.log: "${temp_overload_name}: Reset not needed"
+          else:
+            - logger.log:
+                format: "${temp_overload_name}: Reset failed. Temperature: %.1f°C reading / %.1f°C limit"
+                args: [ 'id(temperature).state', 'id(temp_limit)' ]

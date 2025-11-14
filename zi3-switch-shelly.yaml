@@ -1,0 +1,164 @@
+# Many things lifted from: https://devices.esphome.io/devices/shelly-1pm-gen-4
+#
+# GPIO00	Exposed on header (supposedly also an LED)
+# GPIO01	Button
+# GPIO03	NTC Sensor
+# GPIO04	Relay
+# GPIO06  bl0942 UART Tx
+# GPIO07  bl0942 UART Rx
+# GPIO10  Switch
+# GPIO12  Add-on D-in
+# GPIO16  Add-on D-out
+# GPIO17  Add-on A-in
+
+substitutions:
+  # Init relay to OFF
+  relay1_restore: ALWAYS_OFF
+  # Save the at-boot config, default to ON if config lost
+  relay1_boot_restore: RESTORE_DEFAULT_ON
+
+  # Changes apply immediately but only get flashed eventually
+  # Click "Save to Flash" in HA to force a write
+  flash_write_interval: 15min
+
+  # Power-off time during a power cycle action
+  relay1_cycle_delay: 5s
+
+  # Names and icons used in HA
+  relay1_name: "Relay 1"
+  relay1_icon: mdi:toggle-switch-variant
+  switch1_name: "Switch 1"
+  switch1_icon: mdi:electric-switch
+  button1_name: "Button"
+  button1_icon: mdi:radiobox-blank
+  relay1_cycle_name: "Power Cycle - ${relay1_name}"
+  relay1_cycle_icon: mdi:power-cycle
+  
+  # Config names and icons
+  boot_name: "State at Boot"
+
+packages:
+  nvm: !include zi3-nvm.yaml
+  board: !include zi3-board-c6.yaml
+  temp: !include zi3-shelly-temp.yaml
+  bl0942: !include zi3-bl0942.yaml
+  current: !include zi3-current.yaml
+
+# BL0942 on UART1
+uart:
+  id: uart_energy
+  tx_pin: GPIO6
+  rx_pin: GPIO7
+  baud_rate: 9600
+  stop_bits: 1
+
+# Disable UART logging
+logger:
+  baud_rate: 0
+
+globals:
+  - id: relay1_default
+    type: bool
+
+# Do this when an overload is triggered
+# Called from zi3-shelly-temp/zi3-current
+script:
+  - id: overload_script
+    then:
+      - switch.turn_off: relay1_output
+
+# Flash the red light when things are bad
+# (I am not convinced the Shelly 1PM Gen4 has a red light)
+status_led:
+  pin:
+    number: GPIO00
+    inverted: True
+
+binary_sensor:
+  # Built-in button
+  - platform: gpio
+    id: button1
+    name: ${button1_name}
+    icon: ${button1_icon}
+    pin:
+      number: GPIO01
+      mode: INPUT
+      inverted: True
+  # Screw terminal labeled SW
+  - platform: gpio
+    id: switch1
+    name: ${switch1_name}
+    icon: ${switch1_icon}
+    pin:
+      number: GPIO10
+      mode: INPUT
+    filters:
+      delayed_on_off: 25ms
+
+switch:
+  # Relay 1
+  - platform: template
+    id: relay1
+    name: ${relay1_name}
+    icon: ${relay1_icon}
+    restore_mode: ${relay1_restore}
+    lambda: 'return id(relay1_output).state;'
+    turn_on_action:
+      - if:
+          condition:
+            - lambda: 'return !(id(temp_overload) || id(current_overload));'
+          then:
+            - switch.turn_on: relay1_output
+          else:
+            - logger.log: "${relay1_name}: Disabled by overload"
+    turn_off_action:
+      - switch.turn_off: relay1_output
+  - platform: gpio
+    id: relay1_output
+    pin: GPIO04
+    internal: True
+    restore_mode: ${relay1_restore}
+
+  # Boot Config
+  - platform: template
+    id: relay1_boot
+    name: "${boot_name} - ${relay1_name}"
+    icon: ${relay1_icon}
+    entity_category: config
+    restore_mode: ${relay1_boot_restore}
+    lambda: 'return id(relay1_default);'
+    turn_on_action:
+      - logger.log: "${boot_name} - ${relay1_name}: On"
+      - lambda: 'id(relay1_default) = true;'
+    turn_off_action:
+      - logger.log: "${boot_name} - ${relay1_name}: Off"
+      - lambda: 'id(relay1_default) = false;'
+
+# Power cycle button, for single-action resets
+button:
+  - platform: template
+    id: relay1_cycle
+    name: ${relay1_cycle_name}
+    icon: ${relay1_cycle_icon}
+    on_press: 
+      then:
+        - switch.turn_off: relay1
+        - delay: ${relay1_cycle_delay}
+        - switch.turn_on: relay1
+
+# Set relay states during boot
+esphome:
+  on_boot:
+    # Delay for some init (plus 400ms) but don't wait for WiFi/API
+    - priority: 400
+      then:
+      - delay: 400ms
+      - if:
+          condition:
+            - switch.is_on: relay1_boot
+          then:
+            - logger.log: "Set ${boot_name} - ${relay1_name}: ON"
+            - switch.turn_on: relay1
+          else:
+            - logger.log: "Set ${boot_name} - ${relay1_name}: OFF"
+            - switch.turn_off: relay1

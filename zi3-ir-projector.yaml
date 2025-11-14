@@ -1,0 +1,6 @@
+button:
+  - platform: template
+    name: Projector Power
+    on_press:
+      remote_transmitter.transmit_pronto:
+        data: '0000 006D 000F 0000 005A 0017 0016 0016 002C 0018 0015 0018 0015 002E 0015 002E 0015 0018 0015 0018 0015 0018 0015 0018 0015 0018 0015 0018 0015 0018 0015 0018 0015 0181'

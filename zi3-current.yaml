@@ -1,0 +1,105 @@
+substitutions:
+  # Overload thresholds (and input ranges)
+  current_min: "0.0"
+  current_max: "15.0"
+  current_step: "0.1"
+  current_limit_default: ${current_max}
+  # Require ~1s @ 3Hz of overload samples to trigger
+  current_limit_samples: 3
+
+  # Sensor IDs
+  current_sensor: "current"
+
+  # Config names and icons
+  current_name: "Current"
+  current_icon: mdi:current-ac
+  current_overload_name: "Overload - ${current_name}"
+  current_overload_icon: mdi:alert-octagon
+  current_limit_name: "${current_name} Limit"
+  current_limit_icon: ${current_icon}
+
+globals:
+  - id: current_overload_count
+    type: int
+    initial_value: "0"
+  - id: current_overload
+    type: bool
+    initial_value: "false"
+  - id: current_limit
+    type: float
+    initial_value: ${current_limit_default}
+    restore_value: True
+
+binary_sensor:
+  - platform: template
+    id: current_overload_sensor
+    name: ${current_overload_name}
+    icon: ${current_overload_icon}
+    lambda: 'return id(current_overload);'
+    entity_category: diagnostic
+
+sensor:
+  # Expose our numeric constants to the API
+  - platform: template
+    id: current_max
+    name: "Maximum ${current_name} Limit"
+    lambda: 'return ${current_max};'
+    entity_category: diagnostic
+    update_interval: 24h
+    disabled_by_default: True
+  - platform: template
+    id: current_limit_default
+    name: "Default ${current_name} Limit"
+    lambda: 'return ${current_limit_default};'
+    entity_category: diagnostic
+    update_interval: 24h
+    disabled_by_default: True
+
+number:
+  # API current limit
+  - platform: template
+    id: current_limit_input
+    name: ${current_limit_name}
+    icon: ${current_limit_icon}
+    entity_category: config
+    unit_of_measurement: "A"
+    min_value: ${current_min}
+    max_value: ${current_max}
+    step: ${current_step}
+    lambda: 'return id(current_limit);'
+    set_action:
+      then:
+        - lambda: 'id(current_limit) = x; id(current_limit_input).publish_state(id(current_limit));'
+        - logger.log:
+            format: "${current_limit_name}: %.2f"
+            args: [ "id(current_limit)" ]
+
+# API reset from overload
+button:
+  - platform: template
+    id: current_overload_reset
+    name: "Reset ${current_overload_name}"
+    icon: ${current_overload_icon}
+    entity_category: config
+    on_press:
+      - if:
+          condition:
+            - lambda: |-
+                return (
+                  (id(current_limit) <= ${current_min})              || // current_limit is not valid
+                  (std::isnan(id(${current_sensor}).state))          || // Current is not valid
+                  (id(${current_sensor}).state <= id(current_limit))    // Current does not exceed current_limit
+                );
+          then:
+            - if:
+                condition:
+                  - lambda: 'return id(current_overload);'
+                then:
+                  - logger.log: "${current_overload_name}: Reset successful"
+                  - lambda: 'id(current_overload) = false;'
+                else:
+                  - logger.log: "${current_overload_name}: Reset not needed"
+          else:
+            - logger.log:
+                format: "${current_overload_name}: Reset failed. Current: %.2fA load / %.2fA limit"
+                args: [ 'id(${current_sensor}).state', 'id(current_limit)' ]

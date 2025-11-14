@@ -1,0 +1,9 @@
+substitutions:
+  wrover_board: esp-wrover-kit
+
+esp32:
+  board: ${wrover_board}
+
+packages:
+  esp32: !include zi3-board-esp32.yaml
+  wifi: !include zi3-wifi.yaml

@@ -1,0 +1,13 @@
+# This config applies to C3 boards in general
+# XIAO boards have no additional hardware:
+# https://wiki.seeedstudio.com/XIAO_ESP32C3_Getting_Started/
+
+substitutions:
+  c3_board: esp32-c3-devkitm-1
+
+packages:
+  wifi: !include zi3-wifi.yaml
+  esp32: !include zi3-board-esp32.yaml
+
+esp32:
+  board: ${c3_board}

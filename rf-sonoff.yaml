@@ -1,0 +1,42 @@
+substitutions:
+  name: esp32-rf-sonoff
+  friendly_name: RF - Sonoff
+  api_key: !secret api-rf-sonoff
+  ota_key: !secret ota-rf-sonoff
+  ap_key: !secret ap-rf-sonoff
+
+packages:
+  ap: !include zi3-ap.yaml
+  base: !include zi3-base.yaml
+  board: !include zi3-board-sonoff.yaml
+  #guest_rgb: !include zi3-rf-guest-rgb.yaml
+  rf_doors: !include zi3-rf-door-sensor.yaml
+
+# Radio RX
+remote_receiver:
+  pin: GPIO04
+  filter: 200us
+  tolerance: 50%
+  idle: 4ms
+  dump: rc_switch
+
+# Radio TX
+remote_transmitter:
+  pin: GPIO05
+  carrier_duty_percent: 100%
+
+# Status LED
+status_led:
+  pin:
+    number: GPIO13
+    inverted: true
+
+# Logo LED (green)
+output:
+  - platform: esp8266_pwm
+    id: logo_output
+    pin: GPIO12
+light:
+  - platform: monochromatic
+    output: logo_output
+    name: "Logo LED"

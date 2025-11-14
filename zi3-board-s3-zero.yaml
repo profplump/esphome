@@ -1,0 +1,33 @@
+# Pinout source: https://www.waveshare.com/wiki/ESP32-S3-Zero
+
+substitutions:
+  zero_board: esp32-s3-devkitc-1
+  zero_flash_size: 4MB
+  builtin_rgb_name: "Builtin RGB"
+  builtin_rgb_icon: mdi:head-lightbulb-outline
+
+packages:
+  esp32: !include zi3-board-esp32.yaml
+  wifi: !include zi3-wifi.yaml
+
+esp32:
+  board: ${zero_board}
+  flash_size: ${zero_flash_size}
+
+light:
+  - platform: esp32_rmt_led_strip
+    id: builtin_rgb
+    name: ${builtin_rgb_name}
+    icon: ${builtin_rgb_icon}
+    pin:
+      number: GPIO21
+    chipset: WS2812
+    rgb_order: RGB
+    num_leds: 1
+    effects:
+      - random:
+          transition_length: 5s
+          update_interval: 7s
+      - pulse:
+      - strobe:
+      - flicker:

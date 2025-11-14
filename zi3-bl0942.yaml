@@ -1,0 +1,101 @@
+substitutions:
+  # UART ID for BL0942 chip
+  bl0942_uart: uart_energy
+  # uart:
+  #   id: uart_energy
+  #   tx_pin: GPIO6
+  #   rx_pin: GPIO7
+  #   baud_rate: 9600
+  #   stop_bits: 1
+
+  # Calibration, varies by device
+  current_reference: 251213.46469622
+  voltage_reference: 15873.35944299
+
+  # Sensor names and icons
+  voltage_name: "Voltage"
+  voltage_icon: mdi:sine-wave
+  current_name: "Current"
+  current_icon: mdi:current-ac
+  frequency_name: "Frequency"
+  frequency_icon: mdi:sine-wave
+  power_name: "Power"
+  power_icon: mdi:flash
+  energy_name: "Energy"
+  energy_icon: mdi:lightning-bolt
+
+  # Average 18 * 3 Hz readings (6s update interval)
+  # Use a longer filter interval for fewer reports to HA
+  bl0942_interval: 333ms
+  bl0942_interval_filter: 18
+
+.filter: &power_filters
+  filters:
+    - sliding_window_moving_average:
+        window_size: ${bl0942_interval_filter}
+        send_every: ${bl0942_interval_filter}
+        send_first_at: ${bl0942_interval_filter}
+sensor:
+  # BL0942
+  - platform: bl0942
+    uart_id: uart_energy
+    update_interval: ${bl0942_interval}
+    current_reference: ${current_reference}
+    voltage_reference: ${voltage_reference}
+    current:
+      id: current
+      name: ${current_name}
+      icon: ${current_icon}
+      unit_of_measurement: A
+      accuracy_decimals: 2
+      <<: *power_filters
+      # Overload check uses raw (fast, not filter-averaged) values
+      on_raw_value: 
+        then:
+          !include zi3-current-tmpl.yaml
+    voltage:
+      id: voltage
+      name: ${voltage_name}
+      icon: ${voltage_icon}
+      unit_of_measurement: V
+      accuracy_decimals: 1
+      <<: *power_filters
+    frequency:
+      id: frequency
+      name: ${frequency_name}
+      icon: ${frequency_icon}
+      accuracy_decimals: 2
+      <<: *power_filters
+    power:
+      id: power
+      name: ${power_name}
+      icon: ${power_icon}
+      device_class: power
+      unit_of_measurement: W
+      accuracy_decimals: 0
+      <<: *power_filters
+    energy:
+      id: energy
+      name: ${energy_name}
+      icon: ${energy_icon}
+      device_class: energy
+      state_class: total_increasing
+      unit_of_measurement: kWh
+      accuracy_decimals: 3
+      <<: *power_filters
+
+  # Expose our constants to the API
+  - platform: template
+    id: current_reference
+    name: "${current_name} Reference"
+    lambda: 'return ${current_reference};'
+    entity_category: diagnostic
+    update_interval: 24h
+    disabled_by_default: True
+  - platform: template
+    id: voltage_reference
+    name: "${voltage_name} Reference"
+    lambda: 'return ${voltage_reference};'
+    entity_category: diagnostic
+    update_interval: 24h
+    disabled_by_default: True

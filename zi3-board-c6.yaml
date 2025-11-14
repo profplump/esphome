@@ -1,0 +1,11 @@
+substitutions:
+  c6_board: esp32-c6-devkitc-1
+  c6_flash_size: 8MB
+
+packages:
+  wifi: !include zi3-wifi.yaml
+  esp32: !include zi3-board-esp32.yaml
+
+esp32:
+  board: ${c6_board}
+  flash_size: ${c6_flash_size}

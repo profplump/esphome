@@ -1,0 +1,3 @@
+packages:
+  board: !include zi3-board-esp8285.yaml
+  wifi: !include zi3-wifi.yaml

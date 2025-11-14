@@ -1,0 +1,449 @@
+# Many things lifted from: https://devices.esphome.io/devices/Elegrp-RRR00-in-wall-outlet
+# As noted there almost all the silkscreen labels on the PCB are wrong
+# Power pins: (+3.3V: P14, Gnd: P13)
+#   Along the bottom, on the right
+#   P14 is closest to the edge
+# Flash pins: (TX: P11, RX: P10)
+#   Along the right edge, at the bottom
+#   Behind a capacitor
+#   P11 is closest to the bottom
+# CEN pin (ground to start flash):
+#   Middle pin along the right edge (4 from top/bottom)
+# Log pins: (TX: P0, RX: P1)
+#   Optional (for debugging)
+#   Along the left edge, at the bottom
+#   P0 is closest to the bottom
+
+substitutions:
+  # Init relays and LEDs to OFF
+  relay1_restore: ALWAYS_OFF
+  relay2_restore: ${relay1_restore}
+  led1_restore: ALWAYS_OFF
+  led2_restore: ${led1_restore}
+  # Save the at-boot config, default to ON if config lost
+  relay1_boot_restore: RESTORE_DEFAULT_ON
+  relay2_boot_restore: ${relay1_boot_restore}
+  # Save the local_control config, default to ON if config is lost
+  local_restore: RESTORE_DEFAULT_ON
+  # Save the led_relay_status config, default to OFF if the config is lost
+  led_status_restore: RESTORE_DEFAULT_OFF
+
+  # Hold the upper button this long to reboot
+  reboot_time: 15s
+  # Also hold bottom button this long to factory_reset instead of reboot
+  # It will still take reboot_time to trigger but:
+  #   reset_time < reboot_time allows you to press the buttons in either order
+  #   reset_time > reboot_time disables factory_reset
+  # (I would love a little compile-time arithmetic to make this automatic)
+  reset_time: 14s
+
+  # Changes apply immediately but only get flashed eventually
+  # Click "Save to Flash" in HA to force a write
+  flash_write_interval: 15min
+
+  # Power-off time during a power cycle action
+  relay1_cycle_delay: 5s
+  relay2_cycle_delay: ${relay1_cycle_delay}
+
+  # Names and icons used in HA
+  relay1_name: "Upper"
+  relay1_icon: mdi:power-socket-us
+  relay2_name: "Lower"
+  relay2_icon: mdi:power-socket-us
+  relay1_cycle_name: "Power Cycle - ${relay1_name}"
+  relay1_cycle_icon: mdi:power-cycle
+  relay2_cycle_name: "Power Cycle - ${relay2_name}"
+  relay2_cycle_icon: ${relay1_cycle_icon}
+
+  # Names and icons for HA config
+  local_control_name: "Local Control"
+  local_control_icon: mdi:toggle-switch
+  led_relay_status_name: "LEDs Show Outlet Status"
+  led_relay_status_icon: ${local_control_icon}
+  outlet_name: "Outlet"
+  led_name: "LED"
+  button_name: "Button"
+  boot_name: "State at Boot"
+
+packages:
+  board: !include zi3-board-bk72xx.yaml
+  nvm: !include zi3-nvm.yaml
+  bl0942: !include zi3-bl0942.yaml
+  current: !include zi3-current.yaml
+
+globals:
+  - id: led_relay_status
+    type: bool
+  - id: local_control
+    type: bool
+  - id: relay1_default
+    type: bool
+  - id: relay2_default
+    type: bool
+
+# Do this when an overload is triggered
+# Called from zi3-current
+script:
+  - id: overload_script
+    then:
+      - switch.turn_off: relay1_output
+      - switch.turn_off: relay2_output
+
+# BL0942 on uart1 (P10 & P11, also used for flashing)
+uart:
+  id: uart_energy
+  rx_pin: RX1
+  tx_pin: TX1
+  baud_rate: 4800
+  stop_bits: 1
+# Log to uart2 (P0 & P1), which is default on the CBU
+
+# Flash the red light when things are bad
+status_led:
+  pin: P20
+
+binary_sensor:
+  # Buttons
+  # When local_control is true
+  #   Directly update relay state
+  # When local_control is false
+  #   Only send button state to API
+  - platform: gpio
+    id: button_upper
+    name: "${button_name} - ${relay1_name}"
+    pin:
+      number: P6
+      mode: INPUT_PULLUP
+      inverted: true
+    # Toggle if local_control is enabled
+    on_press:
+      - if:
+          condition:
+            - lambda: 'return id(local_control);'
+          then:
+            - switch.toggle: relay1
+    # If the upper button is held for reboot_time, also reboot
+    on_multi_click:
+      timing:
+        - ON for at least ${reboot_time}
+      then:
+        # If both buttons were held for reset_time, factory reset instead
+        - if:
+            condition:
+              for:
+                time: ${reset_time}
+                condition:
+                  - binary_sensor.is_on: button_upper
+                  - binary_sensor.is_on: button_lower
+            then:
+              - logger.log: "Factory reset..."
+              - delay: 1s
+              - button.press: system_factory_reset
+            else:
+              - logger.log: "Reboot..."
+              - delay: 1s
+              - button.press: system_restart
+  - platform: gpio
+    id: button_lower
+    name: "${button_name} - ${relay2_name}"
+    pin:
+      number: P8
+      mode: INPUT_PULLUP
+      inverted: true
+    on_press:
+      - if:
+          condition:
+            - lambda: 'return id(local_control);'
+          then:
+            - switch.toggle: relay2
+
+output:
+  # libretiny_pwm exists but not on these pins
+  - platform: gpio
+    id: led1_output
+    pin: P14
+  - platform: gpio
+    id: led2_output
+    pin: P28
+
+  # When led_relay_status is true
+  #   Forbid API updates to light state
+  #   Sync light state to relay state 
+  # When led_relay_status is false
+  #   Sync output state to light state
+  - platform: template
+    id: light1_output
+    type: binary
+    write_action:
+      - if:
+          condition:
+            - lambda: 'return !id(led_relay_status);'
+          then:
+            - if:
+                condition:
+                  - lambda: 'return state;'
+                then:
+                  - output.turn_on: led1_output
+                else:
+                  - output.turn_off: led1_output
+          else:
+            - if:
+                condition:
+                  - switch.is_on: relay1_output
+                then:
+                  if:
+                    condition:
+                      - light.is_off: led1
+                    then:
+                      - light.turn_on: led1
+                else:
+                  if:
+                    condition:
+                      - light.is_on: led1
+                    then:
+                      - light.turn_off: led1
+  - platform: template
+    id: light2_output
+    type: binary
+    write_action:
+      - if:
+          condition:
+            - lambda: 'return !id(led_relay_status);'
+          then:
+            - if:
+                condition:
+                  - lambda: 'return state;'
+                then:
+                  - output.turn_on: led2_output
+                else:
+                  - output.turn_off: led2_output
+          else:
+            - if:
+                condition:
+                  - switch.is_on: relay2_output
+                then:
+                  if:
+                    condition:
+                      - light.is_off: led2
+                    then:
+                      - light.turn_on: led2
+                else:
+                  if:
+                    condition:
+                      - light.is_on: led2
+                    then:
+                      - light.turn_off: led2
+
+# Expose white LEDs as lights in the API
+light:
+  - platform: binary
+    id: led1
+    name: "${led_name} - ${relay1_name}"
+    output: light1_output
+    restore_mode: ${led1_restore}
+  - platform: binary
+    id: led2
+    name: "${led_name} - ${relay2_name}"
+    output: light2_output
+    restore_mode: ${led2_restore}
+
+switch:
+  # Relay 1
+  # Do not operate when overload is true
+  # Sync light state when led_relay_status is true
+  - platform: template
+    id: relay1
+    name: "${outlet_name} - ${relay1_name}"
+    icon: ${relay1_icon}
+    restore_mode: ${relay1_restore}
+    lambda: 'return id(relay1_output).state;'
+    turn_on_action:
+      - if:
+          condition:
+            - lambda: 'return !id(current_overload);'
+          then:
+            - switch.turn_on: relay1_output
+          else:
+            - logger.log: "${outlet_name} - ${relay1_name}: Disabled by overload"
+    turn_off_action:
+      - switch.turn_off: relay1_output
+  - platform: gpio
+    id: relay1_output
+    internal: true
+    pin: P9
+    restore_mode: ${relay1_restore}
+    on_turn_on:
+      - if:
+          condition:
+            - lambda: 'return id(led_relay_status);'
+          then:
+            - light.turn_on: led1
+            - output.turn_on: led1_output
+    on_turn_off:
+      - if:
+          condition:
+            - lambda: 'return id(led_relay_status);'
+          then:
+            - light.turn_off: led1
+            - output.turn_off: led1_output
+
+  # Relay 2
+  - platform: template
+    id: relay2
+    name: "${outlet_name} - ${relay2_name}"
+    icon: ${relay2_icon}
+    restore_mode: ${relay2_restore}
+    lambda: 'return id(relay2_output).state;'
+    turn_on_action:
+      - if:
+          condition:
+            - lambda: 'return !id(current_overload);'
+          then:
+            - switch.turn_on: relay2_output
+          else:
+            - logger.log: "${outlet_name} - ${relay2_name}: Disabled by overload"
+    turn_off_action:
+      - switch.turn_off: relay2_output
+  - platform: gpio
+    id: relay2_output
+    internal: true
+    pin: P7
+    restore_mode: ${relay1_restore}
+    on_turn_on:
+      - if:
+          condition:
+            - lambda: 'return id(led_relay_status);'
+          then:
+            - light.turn_on: led2
+            - output.turn_on: led2_output
+    on_turn_off:
+      - if:
+          condition:
+            - lambda: 'return id(led_relay_status);'
+          then:
+            - light.turn_off: led2
+            - output.turn_off: led2_output
+
+  # Button/LED Config
+  - platform: template
+    id: local_control_switch
+    name: ${local_control_name}
+    icon: ${local_control_icon}
+    entity_category: config
+    restore_mode: ${local_restore}
+    lambda: 'return id(local_control);'
+    turn_on_action:
+      - logger.log: "${local_control_name}: Enabled"
+      - lambda: 'id(local_control) = true;'
+    turn_off_action:
+      - logger.log: "${local_control_name}: Disabled"
+      - lambda: 'id(local_control) = false;'
+  - platform: template
+    id: led_relay_status_switch
+    name: ${led_relay_status_name}
+    icon: ${led_relay_status_icon}
+    entity_category: config
+    restore_mode: ${led_status_restore}
+    lambda: 'return id(led_relay_status);'
+    turn_on_action:
+      - lambda: 'id(led_relay_status) = true;'
+      - logger.log: "${local_control_name}: Enabled"
+      # Re-sync light states to relay states
+      - if:
+          condition:
+            - switch.is_on: relay1_output
+          then:
+            - light.turn_on: led1
+            - output.turn_on: led1_output
+          else:
+            - light.turn_off: led1
+            - output.turn_off: led1_output
+      - if:
+          condition:
+            - switch.is_on: relay2_output
+          then:
+            - light.turn_on: led2
+            - output.turn_on: led2_output
+          else:
+            - light.turn_off: led2
+            - output.turn_off: led2_output
+    turn_off_action:
+      - logger.log: "${local_control_name}: Disabled"
+      - lambda: 'id(led_relay_status) = false;'
+      - light.turn_off: led1
+      - light.turn_off: led2
+
+  # Boot Config
+  - platform: template
+    id: relay1_boot
+    name: "${boot_name} - ${relay1_name}"
+    icon: ${relay1_icon}
+    entity_category: config
+    restore_mode: ${relay1_boot_restore}
+    lambda: 'return id(relay1_default);'
+    turn_on_action:
+      - logger.log: "${boot_name} - ${relay1_name}: On"
+      - lambda: 'id(relay1_default) = true;'
+    turn_off_action:
+      - logger.log: "${boot_name} - ${relay1_name}: Off"
+      - lambda: 'id(relay1_default) = false;'
+  - platform: template
+    id: relay2_boot
+    name: "${boot_name} - ${relay2_name}"
+    icon: ${relay2_icon}
+    entity_category: config
+    restore_mode: ${relay2_boot_restore}
+    lambda: 'return id(relay2_default);'
+    turn_on_action:
+      - logger.log: "${boot_name} - ${relay2_name}: On"
+      - lambda: 'id(relay2_default) = true;'
+    turn_off_action:
+      - logger.log: "${boot_name} - ${relay2_name}: Off"
+      - lambda: 'id(relay2_default) = false;'
+
+# Power cycle buttons, for single-action resets
+button:
+  - platform: template
+    id: relay1_cycle
+    name: ${relay1_cycle_name}
+    icon: ${relay1_cycle_icon}
+    on_press: 
+      then:
+        - switch.turn_off: relay1
+        - delay: ${relay1_cycle_delay}
+        - switch.turn_on: relay1
+  - platform: template
+    id: relay2_cycle
+    name: ${relay2_cycle_name}
+    icon: ${relay2_cycle_icon}
+    on_press: 
+      then:
+        - switch.turn_off: relay2
+        - delay: ${relay2_cycle_delay}
+        - switch.turn_on: relay2
+
+# Set relay states during boot
+esphome:
+  on_boot:
+    # Delay for some init (plus 400ms) but don't wait for WiFi/API
+    - priority: 400
+      then:
+      - delay: 400ms
+      - if:
+          condition:
+            - switch.is_on: relay1_boot
+          then:
+            - logger.log: "${boot_name} - ${relay1_name}: ON"
+            - switch.turn_on: relay1
+          else:
+            - logger.log: "${boot_name} - ${relay1_name}: OFF"
+            - switch.turn_off: relay1
+      - if:
+          condition:
+            - switch.is_on: relay2_boot
+          then:
+            - logger.log: "${boot_name} - ${relay2_name}: ON"
+            - switch.turn_on: relay2
+          else:
+            - logger.log: "${boot_name} - ${relay2_name}: OFF"
+            - switch.turn_off: relay2
