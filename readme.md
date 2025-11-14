@@ -82,3 +82,27 @@ These directly expose the necessary flash pins on a female header, but you will 
 
 Example: `outlet-guest-bath.yaml` \
 Library: `zi3-switch-shelly.yaml`
+
+
+## Meikee 25W RGB LED Wall Washer Light
+
+The Meikee RGB LED is a weatherproof RGB LED light bar. It includes a 433 MHz radio reciever and an AC zero-crossing 
+sensor, in additon the 3 PWM LED outputs. It's easy to hook up to all the internal hardware, the RGB outputs are labeled 
+on the board, there's enough physical space to hide a board behind the light guide, and the lamp already runs the control 
+chip on an isolated 3.3V supply
+
+Unforunately the low-voltage regulator draws power from the feedback loop of the high-voltage regulator, so there's only 
+like 15 mA available -- not enough for WiFi. I drilled a hole in the side of mine to add a USB power cord to the esp32 
+inside; I am using this lamp indoors in a hidden location so extra wires are no problem. Less demanding controllers (i.e. 
+things without built-in radios) would probably work, but I didn't check the power limits
+
+The zero-crossing indicator feels like a holdover from when this had an AC dimmer. As sold it was connected to the 
+controller but was not synced with the PWM output. Since the LEDs are driven from high-voltage DC there is no reason they 
+would be synced to AC. I tested this sensor as a frequency meter/pulse counter but decided not to wire it in the final 
+version
+
+The remote from this is pretty good. It sends clean rc_switch codes that all my recievers recognize. The receiver in the 
+lamp is a module on the main board with a coiled wire antenna. It is not great but it works better than many cheap 433 MHz 
+modules
+
+Example: `light-guest-rgb.yaml`
