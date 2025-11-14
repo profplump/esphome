@@ -73,9 +73,9 @@ Library: `zi3-dimmer-shelly.yaml`
 
 ## Shelly PM1 Gen4
 
-The Shelly PM1 Gen 4 is a power-monitoring single-relay with an ESP32-c6 board. It is meant to go in an electrical box. It 
-has a 16A relay, a fast bl0942 power monitor, a high-voltage switch input, and a tempature probe. It does not require a 
-netural
+The Shelly PM1 Gen 4 is a power-monitoring single-relay switch with an ESP32-c6 board. It is meant to go in an electrical 
+box. It has a 16A relay, a fast bl0942 power monitor, a high-voltage switch input, and a tempature probe. It does not 
+require a netural
 
 These directly expose the necessary flash pins on a female header, but you will need to buy or build an adapter for the 
 1.27mm pitch of this tiny connector
@@ -87,7 +87,7 @@ Library: `zi3-switch-shelly.yaml`
 ## Meikee 25W RGB LED Wall Washer Light
 
 The Meikee RGB LED is a weatherproof RGB LED light bar. It includes a 433 MHz radio reciever and an AC zero-crossing 
-sensor, in additon the 3 PWM LED outputs. It's easy to hook up to all the internal hardware, the RGB outputs are labeled 
+sensor, in addition the 3 PWM LED outputs. It's easy to hook up to all the internal hardware, the RGB outputs are labeled 
 on the board, there's enough physical space to hide a board behind the light guide, and the lamp already runs the control 
 chip on an isolated 3.3V supply
 
