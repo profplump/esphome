@@ -9,8 +9,8 @@ Library configs are typically meant to be included as `packages:`
 
 Other files are configs for specific devices (or they are just cruft I haven't deleted yet)
 
-Some devices are re-flashed commerical hardware. Some of them are chip-swapped commerial hardware. Some of them are custom 
-circuits. Below are some that I have documented beyond their YAML config
+Some devices are re-flashed commerical hardware. Some are chip-swapped commerial hardware. Some are custom circuits. Below 
+are some that I have documented beyond their YAML config
 
 ## Aukey LT-T6
 
@@ -29,9 +29,9 @@ float; touch often works even without this pad)
 
 Example: `light-kennel.yaml`
 
-## Elegrp rrr00
+## Elegrp RRR00
 
-Elegrp-rrr00 is a power-monitoring dual-relay US outlet with a CBU board. These are cheap and have 16A relays and a fast 
+Elegrp-RRR00 is a power-monitoring dual-relay US outlet with a CBU board. These are cheap and have 16A relays and a fast 
 bl0942 power monitor. They have 2 buttons, 3 LEDs, and are built well enough that I am not afraid they will burst into 
 flame
 
@@ -61,9 +61,9 @@ Library: `zi3-outlet-wyze.yaml`
 ## Shelly Dimmer 2
 
 The Shelly Dimmer 2 is an AC dimmer rated up to 1.1A with an ESP8285 board. It is meant to go into an electrical box. It 
-has 2 high-voltage switch inputs, a status LED, a temperature probe, and an SMT co-processor that does the actual AC dimming. 
-It does not requires a netural, supports leading and trailing edge dimming, power monitoring, and adjustable minimum and 
-maximum power output settings
+has 2 high-voltage switch inputs, a status LED, a temperature probe, and an SMT co-processor that does the actual AC 
+dimming. It does not require a netural, supports leading and trailing edge dimming, power monitoring, and adjustable 
+minimum and maximum power output settings
 
 These directly expose the necessary flash pins on a female header, but you will need to buy or build an adapter for the 
 1.27mm pitch of this tiny connector

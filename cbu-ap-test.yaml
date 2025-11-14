@@ -1,0 +1,12 @@
+esphome:
+  name: "cbu-ap-test"
+  friendly_name: "CBU AP Test"
+bk72xx:
+  board: cbu
+wifi:
+  ssid: "no_such_network"
+  password: "1111-2222-3333-4444"
+  ap:
+    ssid: "cbu-ap-test"
+    password: "1111-2222-3333-4444"
+captive_portal:
