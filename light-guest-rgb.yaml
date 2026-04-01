@@ -5,6 +5,17 @@ substitutions:
   ota_key: !secret ota-light-guest-rgb
   ap_key: !secret ap-light-guest-rgb
 
+  # Dimming limits
+  dim_min: 0.02
+  dim_max: 1.00
+  dim_delta: 0.015
+  dim_delay: 100
+
+  # Defaults
+  rgb_trans: 1000
+  rgb_bright: 0.20
+  start_bright: 0.10
+
   # Lamp minimums in float-percent
   red_min: 0.003262
   blue_min: 0.002738
@@ -13,8 +24,6 @@ substitutions:
   # Name and icons for HA
   rgb_name: "RGB"
   rgb_icon: mdi:lava-lamp
-  frequency_name: "Frequency"
-  frequency_icon: mdi:sine-wave
 
 packages:
   ap: !include zi3-ap.yaml
@@ -28,34 +37,196 @@ esphome:
     then:
       - light.turn_on:
           id: light_rgb
-          brightness: 15%
+          brightness: ${start_bright}
           red: 50%
           blue: 0%
           green: 25%
-          transition_length: 1s
-  # RGB to 100% (and trigger on_turn_on) @ boot complete
-  #- priority: -100
-  #  then:
-  #    - light.turn_on:
-  #        id: light_rgb
-  #        brightness: 100%
+  # RGB to default (and trigger on_turn_on) @ boot complete
+  - priority: -100
+    then:
+      - light.turn_on:
+          id: light_rgb
+          brightness: ${rgb_bright}
+
+globals:
+  # Store the effect while dimming
+  - id: last_effect
+    type: int
+  - id: last_dim
+    type: uint32_t
 
 remote_receiver:
   # 433MHz RF
   pin:
-    number: GPIO07
+    number: GPIO05
     inverted: True
     mode: INPUT_PULLUP
   filter: 200us
   tolerance: 50%
   idle: 4ms
-  dump: rc_switch
+  #dump: rc_switch
+  on_rc_switch:
+    # The included remote sends rc_switch protocol 6 codes 4310017-4310037
+    - lambda: |-
+        //ESP_LOGD("rc_switch", "protocol = %d, code = '%llu'", x.protocol, x.code);
+        if (x.protocol != 6 || x.code < 4310017 || x.code > 4310037) {
+          return;
+        }
+
+        // Always respond to "On"
+        if (x.code == 4310017) {
+          ESP_LOGD("rc_switch", "On");
+          id(light_rgb).make_call().set_state(true).perform();
+          id(delay_off)->stop();
+          return;
+        }
+
+        // Ignore all other buttons when the lamp is off
+        if (!id(light_rgb)->current_values.is_on()) {
+          ESP_LOGD("rc_switch", "Ignored while off: %d", x.code);
+          return;
+        }
+
+        // Individual buttons
+        switch (x.code) {
+          case 4310018:
+          case 4310019:
+            ESP_LOGD("rc_switch", "Brightness +/-");
+            id(dim)->execute((x.code == 4310018));
+            break;
+          case 4310020:
+            ESP_LOGD("rc_switch", "Off");
+            id(light_rgb).make_call().set_state(false).perform();
+            break;
+          case 4310021:
+          case 4310022:
+            ESP_LOGD("rc_switch", "Flash/Smooth");
+            id(light_rgb).make_call().set_effect((x.code == 4310021) ? "Flash" : "random").perform();
+            break;
+          case 4310023:
+          case 4310024:
+          case 4310025:
+            ESP_LOGD("rc_switch", "Delay Off");
+            id(delay_off)->execute(2 * (x.code - 4310022) * 3600);
+            break;
+          case 4310026:
+            ESP_LOGD("rc_switch", "R");
+            id(set_color)->execute(1.0f, 0.0f, 0.0f);
+            break;
+          case 4310027:
+            ESP_LOGD("rc_switch", "G");
+            id(set_color)->execute(0.0f, 1.0f, 0.0f);
+            break;
+          case 4310028:
+            ESP_LOGD("rc_switch", "B");
+            id(set_color)->execute(0.0f, 0.0f, 1.0f);
+            break;
+          case 4310029:
+            ESP_LOGD("rc_switch", "<Magenta>");
+            id(set_color)->execute(1.0f, 0.0f, 0.5f);
+            break;
+          case 4310030:
+            ESP_LOGD("rc_switch", "W");
+            id(set_color)->execute(1.0f, 1.0f, 1.0f);
+            break;
+          case 4310031:
+            ESP_LOGD("rc_switch", "<Light Blue>");
+            id(set_color)->execute(0.5f, 0.5f, 1.0f);
+            break;
+          case 4310032:
+            ESP_LOGD("rc_switch", "<Orange>");
+            id(set_color)->execute(1.0f, 0.5f, 0.0f);
+            break;
+          case 4310033:
+            ESP_LOGD("rc_switch", "<Blue Green>");
+            id(set_color)->execute(0.0f, 1.0f, 1.0f);
+            break;
+          case 4310034:
+            ESP_LOGD("rc_switch", "<Blue Purple>");
+            id(set_color)->execute(0.25f, 0.0f, 1.0f);
+            break;
+          case 4310035:
+            ESP_LOGD("rc_switch", "<Yellow>");
+            id(set_color)->execute(1.0f, 1.0f, 0.0f);
+            break;
+          case 4310036:
+            ESP_LOGD("rc_switch", "<Dark Green>");
+            id(set_color)->execute(0.0f, 0.5f, 1.0f);
+            break;
+          case 4310037:
+            ESP_LOGD("rc_switch", "<Purple>");
+            id(set_color)->execute(0.5f, 0.0f, 1.0f);
+            break;
+        }
+
+script:
+  - id: set_color
+    parameters: 
+      red: float
+      green: float
+      blue: float
+    then:
+      - lambda: |-
+          id(last_effect) = 0;
+          auto call = id(light_rgb).make_call();
+          call.set_rgb(red, green, blue);
+          call.set_effect((int)0);
+          call.perform();
+
+  - id: delay_off
+    mode: restart
+    parameters: 
+      delay: int
+    then:
+      - logger.log:
+          format: "Turn off in %d seconds"
+          args: [ 'delay' ]
+      - delay: !lambda return(delay);
+      - light.turn_off: light_rgb
+
+  - id: dim
+    mode: single
+    parameters:
+      down: bool
+    then:
+      - lambda: |-
+          // Enforce a maximum repeat rate
+          uint32_t now = millis();
+          if (id(last_dim) + ${dim_delay} > now) {
+            return;
+          }
+          id(last_dim) = now;
+
+          float bright = id(light_rgb)->current_values.get_brightness();
+          if (down) {
+            bright = std::max(bright - ${dim_delta}f, ${dim_min}f);
+          } else {
+            bright = std::min(bright + ${dim_delta}f, ${dim_max}f);
+          }
+
+          id(effect_pause)->execute();
+          auto call = id(light_rgb)->make_call();
+          call.set_transition_length(${dim_delay});
+          call.set_brightness(bright);
+          call.perform();
+
+  - id: effect_pause
+    mode: restart
+    then:
+      - lambda: |-
+          int effect = id(light_rgb).get_current_effect_index();
+          if (effect != 0) {
+            id(last_effect) = effect;
+            id(light_rgb).make_call().set_effect((int)0).perform();
+          }
+      - delay: !lambda return (5 * ${dim_delay});
+      - lambda: id(light_rgb).make_call().set_effect(id(last_effect)).perform();
 
 output:
   # Red PWM & scaler
   - platform: ledc
     id: led_red
-    pin: GPIO20
+    pin: GPIO00
   - platform: template
     type: float
     id: lamp_red
@@ -70,7 +241,9 @@ output:
   # Blue PWM & scaler
   - platform: ledc
     id: led_blue
-    pin: GPIO19
+    pin:
+      number: GPIO02
+      ignore_strapping_warning: True
   - platform: template
     type: float
     id: lamp_blue
@@ -85,7 +258,8 @@ output:
   # Green PWM & scaler
   - platform: ledc
     id: led_green
-    pin: GPIO21
+    pin:
+      number: GPIO01
   - platform: template
     type: float
     id: lamp_green
@@ -107,16 +281,26 @@ light:
     green: lamp_green
     blue: lamp_blue
     restore_mode: ALWAYS_OFF
-    default_transition_length: 500ms
+    gamma_correct: 3.2
+    default_transition_length: ${rgb_trans}ms
     effects:
       - random:
           transition_length: 5s
           update_interval: 7s
+      - random:
+          name: Flash
+          transition_length: 50ms
+          update_interval: 666ms
       - pulse:
       - strobe:
       - flicker:
     on_turn_on:
       then:
+        # Wait so we don't override the brightness transition
+        - delay: ${rgb_trans}ms
+        # Always start random
         - light.control:
             id: light_rgb
             effect: random
+        # Cancel delay-off
+        - script.stop: delay_off
