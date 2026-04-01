@@ -5,10 +5,14 @@ substitutions:
   internal_temp_interval: 300s
   restart_name: 'Restart device'
   restart_icon: mdi:reload
+  wifi_min_auth: WPA2
 
 esp32:
   framework:
     type: ${esp32_framework_type}
+
+wifi:
+  min_auth_mode: ${wifi_min_auth}
 
 sensor:
   - platform: internal_temperature

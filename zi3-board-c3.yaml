@@ -1,6 +1,8 @@
 # This config applies to C3 boards in general
-# XIAO boards have no additional hardware:
+
+# XIAO C3 boards have no additional hardware and so can use this base config directly:
 # https://wiki.seeedstudio.com/XIAO_ESP32C3_Getting_Started/
+# Use substition c3_board: seeed_xiao_esp32c3 to select the xiao explicltly
 
 substitutions:
   c3_board: esp32-c3-devkitm-1

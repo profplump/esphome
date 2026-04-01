@@ -3,11 +3,7 @@ substitutions:
   wifi_power_save: LIGHT
   wifi_ssid: !secret wifi_ssid
   wifi_key: !secret wifi_password
-  wifi_ip_interval: 1h
-  wifi_signal_interval: ${wifi_ip_interval}
-  wifi_bssid_interval: ${wifi_ip_interval}
-  wifi_ssid_interval: ${wifi_ip_interval}
-  wifi_scan_interval: never
+  wifi_signal_interval: 1h
 
 network:
     enable_ipv6: ${enable_ipv6}
@@ -22,6 +18,7 @@ sensor:
   - platform: wifi_signal
     name: "WiFi Signal dB"
     id: wifi_signal_db
+    icon: mdi:wifi-strength-2
     entity_category: diagnostic
     update_interval: ${wifi_signal_interval}
     disabled_by_default: True
@@ -29,6 +26,7 @@ sensor:
   - platform: copy
     source_id: wifi_signal_db
     name: "WiFi Signal %"
+    icon: mdi:wifi-strength-2
     filters:
       - lambda: return min(max(2.06 * (x + 100.0), 0.0), 100.0);
     unit_of_measurement: "%"
@@ -39,31 +37,52 @@ sensor:
 text_sensor:
   - platform: wifi_info
     ip_address:
-      name: Device IP
+      name: IP
       icon: mdi:ip-network
       entity_category: diagnostic
-      update_interval: ${wifi_ip_interval}
       disabled_by_default: True
+      address_0:
+        name: IP 0
+        icon: mdi:ip-network
+        disabled_by_default: True
+      address_1:
+        name: IP 1
+        icon: mdi:ip-network
+        disabled_by_default: True
+      address_2:
+        name: IP 2
+        icon: mdi:ip-network
+        disabled_by_default: True
+      address_3:
+        name: IP 3
+        icon: mdi:ip-network
+        disabled_by_default: True
+      address_4:
+        name: IP 4
+        icon: mdi:ip-network
+        disabled_by_default: True
     mac_address:
-      name: Device MAC
-      icon: mdi:chip
+      name: MAC
+      icon: mdi:lan
+      entity_category: diagnostic
+      disabled_by_default: True
+    power_save_mode:
+      name: WiFi Power Save Mode
+      icon: mdi:wifi-star
       entity_category: diagnostic
       disabled_by_default: True
     ssid:
-      name: Device SSID
-      icon: mdi:chip
+      name: SSID
+      icon: mdi:wifi
       entity_category: diagnostic
-      update_interval: ${wifi_ssid_interval}
       disabled_by_default: True
     bssid:
-      name: Device BSSID
-      icon: mdi:chip
+      name: BSSID
+      icon: mdi:wan
       entity_category: diagnostic
-      update_interval: ${wifi_bssid_interval}
       disabled_by_default: True
     scan_results:
       name: WiFi Scan
-      icon: mdi:chip
+      icon: mdi:access-point-network
       entity_category: diagnostic
-      update_interval: ${wifi_scan_interval}
       disabled_by_default: True

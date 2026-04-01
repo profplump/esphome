@@ -2,7 +2,6 @@
 # So disable it unless someone higher demands it
 substitutions:
   enable_ipv6: false
-  eth_ip_interval: 300s
 
 network:
   enable_ipv6: ${enable_ipv6}
@@ -23,7 +22,6 @@ text_sensor:
       name: Device IP
       icon: mdi:ip-network
       entity_category: diagnostic
-      update_interval: ${eth_ip_interval}
       disabled_by_default: True
     mac_address:
       name: Device MAC
