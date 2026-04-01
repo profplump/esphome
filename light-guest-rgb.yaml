@@ -13,7 +13,7 @@ substitutions:
 
   # Defaults
   rgb_trans: 1000
-  rgb_bright: 0.20
+  rgb_bright: 1.00
   start_bright: 0.10
 
   # Lamp minimums in float-percent
@@ -181,7 +181,7 @@ script:
       - logger.log:
           format: "Turn off in %d seconds"
           args: [ 'delay' ]
-      - delay: !lambda return(delay);
+      - delay: !lambda return(delay * 1000);
       - light.turn_off: light_rgb
 
   - id: dim
