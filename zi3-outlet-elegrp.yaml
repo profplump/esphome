@@ -23,8 +23,9 @@ substitutions:
   # Save the at-boot config, default to ON if config lost
   relay1_boot_restore: RESTORE_DEFAULT_ON
   relay2_boot_restore: ${relay1_boot_restore}
-  # Save the local_control config, default to ON if config is lost
+  # Save the local/remote_control config, default to ON if config is lost
   local_restore: RESTORE_DEFAULT_ON
+  remote_restore: RESTORE_DEFAULT_ON
   # Save the led_relay_status config, default to OFF if the config is lost
   led_status_restore: RESTORE_DEFAULT_OFF
 
@@ -58,6 +59,8 @@ substitutions:
   # Names and icons for HA config
   local_control_name: "Local Control"
   local_control_icon: mdi:toggle-switch
+  remote_control_name: "Remote Control"
+  remote_control_icon: ${local_control_icon}
   led_relay_status_name: "LEDs Show Outlet Status"
   led_relay_status_icon: ${local_control_icon}
   outlet_name: "Outlet"
@@ -75,6 +78,8 @@ globals:
   - id: led_relay_status
     type: bool
   - id: local_control
+    type: bool
+  - id: remote_control
     type: bool
   - id: relay1_default
     type: bool
@@ -250,6 +255,8 @@ light:
 switch:
   # Relay 1
   # Do not operate when overload is true
+  # Do not operate when remote_control and local_control are false
+  #   local_control is enforced in the button handler
   # Sync light state when led_relay_status is true
   - platform: template
     id: relay1
@@ -260,13 +267,19 @@ switch:
     turn_on_action:
       - if:
           condition:
-            - lambda: 'return !id(current_overload);'
+            - lambda: 'return !id(current_overload) && (id(local_control) || id(remote_control));'
           then:
             - switch.turn_on: relay1_output
           else:
-            - logger.log: "${outlet_name} - ${relay1_name}: Disabled by overload"
+            - logger.log: "${outlet_name} - ${relay1_name}: Disabled"
     turn_off_action:
-      - switch.turn_off: relay1_output
+      - if:
+          condition:
+            - lambda: 'return id(local_control) || id(remote_control);'
+          then:
+            - switch.turn_off: relay1_output
+          else:
+            - logger.log: "${outlet_name} - ${relay1_name}: Disabled"
   - platform: gpio
     id: relay1_output
     internal: true
@@ -297,13 +310,20 @@ switch:
     turn_on_action:
       - if:
           condition:
-            - lambda: 'return !id(current_overload);'
+            - lambda: 'return !id(current_overload) && (id(local_control) || id(remote_control));'
           then:
             - switch.turn_on: relay2_output
           else:
-            - logger.log: "${outlet_name} - ${relay2_name}: Disabled by overload"
+            - logger.log: "${outlet_name} - ${relay2_name}: Disabled"
     turn_off_action:
-      - switch.turn_off: relay2_output
+      - if:
+          condition:
+            - lambda: 'return id(local_control) || id(remote_control);'
+          then:
+            - switch.turn_off: relay2_output
+          else:
+            - logger.log: "${outlet_name} - ${relay2_name}: Disabled"
+
   - platform: gpio
     id: relay2_output
     internal: true
@@ -338,6 +358,19 @@ switch:
     turn_off_action:
       - logger.log: "${local_control_name}: Disabled"
       - lambda: 'id(local_control) = false;'
+  - platform: template
+    id: remote_control_switch
+    name: ${remote_control_name}
+    icon: ${remote_control_icon}
+    entity_category: config
+    restore_mode: ${remote_restore}
+    lambda: 'return id(remote_control);'
+    turn_on_action:
+      - logger.log: "${remote_control_name}: Enabled"
+      - lambda: 'id(remote_control) = true;'
+    turn_off_action:
+      - logger.log: "${remote_control_name}: Disabled"
+      - lambda: 'id(remote_control) = false;'
   - platform: template
     id: led_relay_status_switch
     name: ${led_relay_status_name}

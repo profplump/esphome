@@ -16,6 +16,8 @@ substitutions:
   relay1_restore: ALWAYS_OFF
   # Save the at-boot config, default to ON if config lost
   relay1_boot_restore: RESTORE_DEFAULT_ON
+  # Save the remote_control config, default to ON if config is lost
+  remote_restore: RESTORE_DEFAULT_ON
 
   # Changes apply immediately but only get flashed eventually
   # Click "Save to Flash" in HA to force a write
@@ -33,6 +35,8 @@ substitutions:
   button1_icon: mdi:radiobox-blank
   relay1_cycle_name: "Power Cycle - ${relay1_name}"
   relay1_cycle_icon: mdi:power-cycle
+  remote_control_name: "Remote Control"
+  remote_control_icon: mdi:toggle-switch
   
   # Config names and icons
   boot_name: "State at Boot"
@@ -58,6 +62,8 @@ logger:
 
 globals:
   - id: relay1_default
+    type: bool
+  - id: remote_control
     type: bool
 
 # Do this when an overload is triggered
@@ -106,13 +112,19 @@ switch:
     turn_on_action:
       - if:
           condition:
-            - lambda: 'return !(id(temp_overload) || id(current_overload));'
+            - lambda: 'return !(id(temp_overload) || id(current_overload)) && id(remote_control);'
           then:
             - switch.turn_on: relay1_output
           else:
-            - logger.log: "${relay1_name}: Disabled by overload"
+            - logger.log: "${relay1_name}: Disabled"
     turn_off_action:
-      - switch.turn_off: relay1_output
+      - if:
+          condition:
+            - lambda: 'return id(remote_control);'
+          then:
+            - switch.turn_off: relay1_output
+          else:
+            - logger.log: "${relay1_name}: Disabled"
   - platform: gpio
     id: relay1_output
     pin: GPIO04
@@ -133,6 +145,21 @@ switch:
     turn_off_action:
       - logger.log: "${boot_name} - ${relay1_name}: Off"
       - lambda: 'id(relay1_default) = false;'
+
+  # Remote control
+  - platform: template
+    id: remote_control_switch
+    name: ${remote_control_name}
+    icon: ${remote_control_icon}
+    entity_category: config
+    restore_mode: ${remote_restore}
+    lambda: 'return id(remote_control);'
+    turn_on_action:
+      - logger.log: "${remote_control_name}: Enabled"
+      - lambda: 'id(remote_control) = true;'
+    turn_off_action:
+      - logger.log: "${remote_control_name}: Disabled"
+      - lambda: 'id(remote_control) = false;'
 
 # Power cycle button, for single-action resets
 button:
