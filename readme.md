@@ -35,9 +35,9 @@ Elegrp-RRR00 is a power-monitoring dual-relay US outlet with a CBU board. These 
 bl0942 power monitor. They have 2 buttons, 3 LEDs, and are built well enough that I am not afraid they will burst into 
 flame
 
-But they are not perfect. The first flash requires moderately difficuly soldering, as the necessary pins are both 
-difficult to access and labeled incorrectly on the silkscreen. It may be possible to OTA-chain-load from the vendor firmware 
-to esphome, but I didn't check
+But they are not perfect. The first flash requires moderately difficult soldering, as the necessary pins are both hard to 
+access and labeled incorrectly on the silkscreen. It may be possible to OTA-chain-load from the vendor firmware to esphome, 
+but I didn't check
 
 I have also had bad luck with stability on these. Mostly they run fine and I do use several of them, but the Fallback AP 
 always makes them crash (so you can't change WiFi via the AP), and they somtimes crash when processing actions. When they 
@@ -92,9 +92,9 @@ on the board, there's enough physical space to hide a board behind the light gui
 chip on an isolated 3.3V supply
 
 Unforunately the low-voltage regulator draws power from the feedback loop of the high-voltage regulator, so there's only 
-like 15 mA available -- not enough for WiFi. I drilled a hole in the side of mine to add a USB power cord to the esp32 
+like 15 mA available --- not enough for WiFi. I drilled a hole in the side of mine to add a USB power cord to the esp32 
 inside; I am using this lamp indoors in a hidden location so extra wires are no problem. Less demanding controllers (i.e. 
-things without built-in radios) would probably work, but I didn't check the power limits
+things without built-in radios) would probably work
 
 The zero-crossing indicator feels like a holdover from when this had an AC dimmer. As sold it was connected to the 
 controller but was not synced with the PWM output. Since the LEDs are driven from high-voltage DC there is no reason they 
