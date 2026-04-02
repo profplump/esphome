@@ -16,6 +16,8 @@ substitutions:
   rgb_bright: 1.00
   start_bright: 0.10
 
+  # Lamp gamma
+  rgb_gamma: 3.2
   # Lamp minimums in float-percent
   red_min: 0.003262
   blue_min: 0.002738
@@ -280,8 +282,9 @@ light:
     red: lamp_red
     green: lamp_green
     blue: lamp_blue
+    # on_boot overrides restore behavior
     restore_mode: ALWAYS_OFF
-    gamma_correct: 3.2
+    gamma_correct: ${rgb_gamma}
     default_transition_length: ${rgb_trans}ms
     effects:
       - random:
