@@ -1,0 +1,155 @@
+substitutions:
+  name: esp32-av-hdmi-switch
+  friendly_name: "AV - HDMI Switch"
+  api_key: !secret api-av-hdmi-switch
+  ota_key: !secret ota-av-hdmi-switch
+  ap_key: !secret ap-av-hdmi-switch
+  c3_board: seeed_xiao_esp32c3
+
+  hdmi_name: "HDMI Input"
+  hdmi_icon: mdi:video-input-hdmi
+
+packages:
+  ap: !include zi3-ap.yaml
+  base: !include zi3-base.yaml
+  board: !include zi3-board-c3.yaml
+
+esphome:
+  on_boot:
+  # Sync hardware to input 1, auto-switch disabled @ early boot
+  - priority: 600
+    then:
+      - switch.turn_off: autoswitch
+      - select.set:
+          id: hdmi_input
+          option: "1"
+
+uart:
+  id: uart_hdmi
+  baud_rate: 19200
+  rx_pin: 
+    number: GPIO10
+  tx_pin:
+    number: GPIO09
+    ignore_strapping_warning: true
+  debug:
+    direction: BOTH
+    dummy_receiver: true
+    debug_prefix: "HDMI_UART "
+    sequence:
+      - lambda: |-
+          UARTDebug::log_string(direction, bytes, debug_prefix);
+
+switch:
+  - platform: template
+    id: autoswitch
+    name: "Auto Switch"
+    restore_mode: ALWAYS_OFF
+    lambda: 'return id(autoswitch).state;'
+    turn_on_action: 
+      then:
+        - script.execute:
+            id: auto_enable
+            enable: True
+    turn_off_action: 
+      then:
+        - script.execute:
+            id: auto_enable
+            enable: False
+
+select:
+  - platform: template
+    id: hdmi_input
+    name: ${hdmi_name}
+    icon: ${hdmi_icon}
+    initial_option: "1"
+    options:
+      - "1"
+      - "2"
+      - "3"
+      - "4"
+    set_action: 
+      then:
+        - script.execute:
+            id: input_swtich
+            opt_value: !lambda return x;
+
+script:
+  - id: input_swtich
+    mode: queued
+    parameters:
+      opt_value: string
+    then:
+      - uart.write: "\r\n"
+      - uart.write: "sw i0"
+      - uart.write: !lambda return { opt_value.data()[0] };
+      - uart.write: "\r\n"
+      - lambda: id(hdmi_input).publish_state(opt_value);
+  - id: auto_enable
+    mode: queued
+    parameters:
+      enable: bool
+    then:
+      - uart.write: "\r\n"
+      - uart.write: "pod "
+      - if:
+          condition:
+            - lambda: return enable;
+          then:
+            - uart.write: "on"
+          else:
+            - uart.write: "off"
+      - uart.write: "\r\n"
+      - lambda: id(autoswitch).publish_state(enable);
+
+# Manual buttons for all supported commands
+# Disabled by default in preference of the select/switch stateful controls
+button:
+  - platform: template
+    id: i_1
+    name: "${hdmi_name} 1"
+    on_press:
+      - script.execute: 
+          id: input_swtich
+          opt_value: "1"
+    disabled_by_default: True
+  - platform: template
+    id: i_2
+    name: "${hdmi_name} 2"
+    on_press:
+      - script.execute: 
+          id: input_swtich
+          opt_value: "2"
+    disabled_by_default: True
+  - platform: template
+    id: i_3
+    name: "${hdmi_name} 3"
+    on_press:
+      - script.execute: 
+          id: input_swtich
+          opt_value: "3"
+    disabled_by_default: True
+  - platform: template
+    id: i_4
+    name: "${hdmi_name} 4"
+    on_press:
+      - script.execute: 
+          id: input_swtich
+          opt_value: "4"
+    disabled_by_default: True
+  - platform: template
+    id: a_on
+    name: "Auto Switch - Enable"
+    on_press:
+      - script.execute: 
+          id: auto_enable
+          enable: True
+    disabled_by_default: True
+  - platform: template
+    id: a_off
+    name: "Auto Switch - Disable"
+    on_press:
+      - script.execute: 
+          id: auto_enable
+          enable: False
+    disabled_by_default: True
