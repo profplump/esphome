@@ -92,7 +92,7 @@ on the board, there's enough physical space to hide a board behind the light gui
 chip on an isolated 3.3V supply
 
 Unforunately the low-voltage regulator draws power from the feedback loop of the high-voltage regulator, so there's only 
-like 15 mA available --- not enough for WiFi. I drilled a hole in the side of mine to add a USB power cord to the esp32 
+like 15 mA available &mdash; not enough for WiFi. I drilled a hole in the side of mine to add a USB power cord to the esp32 
 inside; I am using this lamp indoors in a hidden location so extra wires are no problem. Less demanding controllers (i.e. 
 things without built-in radios) would probably work
 
@@ -109,20 +109,21 @@ Example: `light-guest-rgb.yaml`
 
 ## Vornado Transom Fan
 
-The [Vornado Transom](https://vornado.com/products/transom-parent) fan is a 4-speed bi-directional blower fan designed to 
-mount across the bottom of a hung window. It includes an IR remote, runs at 4 discrete speeds, can be reversed 
-electronically, and includes a thermostatic function. It also has a terrible UI that spends several seconds doing a light 
-show every time you turn it own, and requires multiple buttons pushes on both the remote and local interfaces if you want to 
-change any settings. It's very difficult to use reliably if you cannot see the display panel when changing settings
+The [Vornado Transom](https://vornado.com/products/transom-parent) fan is a blower fan designed to mount across the bottom 
+of a hung window. I like the fan hardware. It includes an IR remote, runs at 4 discrete speeds, can be reversed 
+electronically, closes when off, and includes a thermostatic function. I do not like the UI. It spends several seconds doing 
+a light show every time you turn it on &mdash; which you have to wait for before you can change any settings &mdash; and it 
+requires multiple state-dependent button pushes on both the remote and local interfaces. It's very difficult to use reliably 
+if you cannot see the display panel when changing settings (or if you are in a hurry)
 
-Luckily it has seperate UI and motor controller boards internally, and uses a simple UART to communicate between them, so 
-it's possible to read and change the device state without any significant modification. The connection between boards 
-provides 5V power and the UART channel, and the IR receiver is easily accessible from the back of the UI board. Between 
-those two data connections it's possible to simulate IR input (and/or read IR ambient signals from the sensor) and to 
-determine the entire fan state which is sufficient for closed-loop automation
+Luckily it has seperate internal boards for the UI and motor controller and uses a simple UART to communicate between them, 
+so it's possible to read the device state without any significant modification. The connection between boards provides 5V 
+power and the UART channel, and the IR receiver is easily accessible from the back of the UI board. Between those two data 
+connections it's possible to simulate IR input (and/or read IR ambient signals from the sensor) and to determine the entire 
+fan state which is sufficient for closed-loop automation
 
-The device includes a thermostatic mode, this mode can be detected from the UART data but the setpoint and current 
-temperature cannot be. But the thermocouple would be simply to move to a smarter control board if you wanted to use the 
-fan's existing hardware for a custom thermostatic control
+The device includes a thermostatic mode. This mode can be detected from the UART data but the setpoint and current 
+temperature cannot be. Fortunately the thermocouple is connected seperately and would be simple to move to a smarter control 
+board if you wanted to use the fan's existing sensor for a custom thermostatic control
 
 Example: `fan-office.yaml`
