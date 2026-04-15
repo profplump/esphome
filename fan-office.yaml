@@ -1,0 +1,53 @@
+substitutions:
+  name: esp32-fan-office
+  friendly_name: "Fan - Office"
+  api_key: !secret api-fan-office
+  ota_key: !secret ota-fan-office
+  ap_key: !secret ap-fan-office
+  c3_board: seeed_xiao_esp32c3
+
+packages:
+  ap: !include zi3-ap.yaml
+  base: !include zi3-base.yaml
+  board: !include zi3-board-c3.yaml
+  fan: !include zi3-ir-fan.yaml
+
+# Inject IR-encoded TTL signals to the fan
+remote_transmitter:
+  id: ir_tx_ttl
+  pin:
+    number: GPIO4
+    inverted: True
+    mode:
+      output: True
+      open_drain: True
+  carrier_duty_percent: 50%
+  non_blocking: True
+
+# Read IR, to capture codes as seen at the fan
+# Obviously you can only do TX or RX on this pin
+#remote_receiver:
+#  id: ir_rx_ttl
+#  pin:
+#    number: GPIO05
+#    inverted: True
+#    mode:
+#      input: True
+#      pullup: True
+#  dump: all
+
+# Fan main board sends TTL serial to the motor control board
+# Read it so we know the command state of all the motors
+uart:
+  id: uart_motor
+  baud_rate: 9600
+  rx_pin: 
+    number: GPIO10
+    inverted: True
+  debug:
+    direction: BOTH
+    dummy_receiver: True
+    debug_prefix: "Motor "
+    sequence:
+      - lambda: |-
+          UARTDebug::log_string(direction, bytes, debug_prefix);
