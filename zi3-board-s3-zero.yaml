@@ -5,6 +5,7 @@ substitutions:
   zero_flash_size: 4MB
   builtin_rgb_name: "Builtin RGB"
   builtin_rgb_icon: mdi:head-lightbulb-outline
+  builtin_rgb_rmt: 48
 
 packages:
   esp32: !include zi3-board-esp32.yaml
@@ -24,6 +25,7 @@ light:
     chipset: WS2812
     rgb_order: RGB
     num_leds: 1
+    rmt_symbols: ${builtin_rgb_rmt}
     effects:
       - random:
           transition_length: 5s
