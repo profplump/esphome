@@ -4,50 +4,74 @@ substitutions:
   api_key: !secret api-fan-office
   ota_key: !secret ota-fan-office
   ap_key: !secret ap-fan-office
-  c3_board: seeed_xiao_esp32c3
 
 packages:
   ap: !include zi3-ap.yaml
   base: !include zi3-base.yaml
-  board: !include zi3-board-c3.yaml
+  board: !include zi3-board-s3-zero.yaml
   fan: !include zi3-ir-fan.yaml
 
 # Inject IR-encoded TTL signals to the fan
 remote_transmitter:
-  id: ir_tx_ttl
   pin:
-    number: GPIO4
+    number: GPIO06
     inverted: True
     mode:
       output: True
+      # Open-drain so that native IR still works
       open_drain: True
   carrier_duty_percent: 50%
   non_blocking: True
+  rmt_symbols: 48
 
-# Read IR, to capture codes as seen at the fan
-# Obviously you can only do TX or RX on this pin
+# Read IR to capture codes as seen at the fan
+# Bridge to the IR TX pin for bi-directional IR
 #remote_receiver:
-#  id: ir_rx_ttl
 #  pin:
 #    number: GPIO05
 #    inverted: True
 #    mode:
 #      input: True
-#      pullup: True
-#  dump: all
+#      pullup: False
+#  rmt_symbols: 48
+#  dump: pronto
 
 # Fan main board sends TTL serial to the motor control board
-# Read it so we know the command state of all the motors
+# Read it so we know the command state of all the motors (and temp mode)
 uart:
   id: uart_motor
-  baud_rate: 9600
-  rx_pin: 
-    number: GPIO10
-    inverted: True
+  baud_rate: 4800
+  rx_pin:
+    number: GPIO04
+    inverted: False
   debug:
     direction: BOTH
     dummy_receiver: True
     debug_prefix: "Motor "
+    after:
+      timeout: 15ms
+      bytes: 12
     sequence:
       - lambda: |-
-          UARTDebug::log_string(direction, bytes, debug_prefix);
+          UARTDebug::log_hex(direction, bytes, ' ', debug_prefix);
+
+
+# 12 bytes @ 4800 baud
+# Byte 1 :
+# 	Always:   00
+# Byte 2 Direction:
+# 	Off:		  98/18
+# 	Intake:	  1E
+# 	Exhaust:	9E	
+# Byte 3: Thermostat
+# 	On:		    18
+# 	Off:	    1E
+# Byte 4:
+# 	Always:	  18
+# Byte 5 Speed:
+# 	1:		    18
+# 	2:		    98
+# 	3:		    1E
+# 	4:		    9E
+# Bytes 6-12:
+# 	Always:   18 1E 98 98 98 1E 1E
