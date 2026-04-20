@@ -5,11 +5,117 @@ substitutions:
   ota_key: !secret ota-fan-office
   ap_key: !secret ap-fan-office
 
+  # Default settings
+  fan_restore: ALWAYS_OFF
+  thermostat_restore: ALWAYS_OFF
+
+  # Names and icons for HA
+  fan_name: "Fan"
+  fan_icon: mdi:fan
+  power_name: "Power"
+  power_icon: mdi:fan-off
+  direction_name: "Direction"
+  direction_icon: mdi:diameter-outline
+  speed_name: "Speed"
+  speed_icon: mdi:fan-speed-3
+  thermostat_name: "Thermostat"
+  thermostat_icon: mdi:thermostat-auto
+
 packages:
   ap: !include zi3-ap.yaml
   base: !include zi3-base.yaml
-  board: !include zi3-board-s3-zero.yaml
+  board: !include zi3-board-s3-xiao.yaml
   fan: !include zi3-ir-fan.yaml
+
+# The baked-in fan interfaces speed-count and direction
+fan:
+  - platform: template
+    id: fan_cmd
+    name: ${fan_name}
+    icon: ${fan_icon}
+    has_direction: True
+    speed_count: 4
+    restore_mode: ${fan_restore}
+    on_state:
+      - script.execute:
+          id: set_power
+          on: True
+    on_speed_set:
+      - script.execute:
+          id: set_speed
+          speed: 2
+    on_direction_set:
+      - script.execute:
+          id: set_direction
+          forward: True
+
+# Map the fan's internal thermostat state
+switch:
+  - platform: template
+    id: thermostat
+    name: ${thermostat_name}
+    icon: ${thermostat_icon}
+    restore_mode: ${thermostat_restore}
+    lambda: return (id(thermostat_sense));
+    turn_on_action:
+      then:
+        - script.execute:
+            id: set_thermostat
+            on: True
+    turn_off_action: 
+      then:
+        - script.execute:
+            id: set_thermostat
+            on: False
+
+# Publish the sensed fan state
+# Used internally for state feedback but disabled in HA by default
+binary_sensor:
+  - platform: template
+    id: power_sense
+    name: "${power_name} - Actual"
+    icon: ${power_icon}
+    disabled_by_default: True
+  - platform: template
+    id: direction_sense
+    name: "${direction_name} - Actual"
+    icon: ${direction_icon}
+    disabled_by_default: True
+    #lambda: return (id(direction_sense));
+  - platform: template
+    id: thermostat_sense
+    name: "${thermostat_name} - Actual"
+    icon: ${thermostat_icon}
+    disabled_by_default: True
+text_sensor:
+  - platform: template
+    id: speed_sense
+    name: "${speed_name} - Actual"
+    icon: ${speed_icon}
+    disabled_by_default: True
+
+# The conditional clicking we need to send IR commands
+script:
+  - id: set_power
+    parameters:
+      on: bool
+    then:
+      - logger.log: "Script: set_power"
+  - id: set_direction
+    parameters:
+      forward: bool
+    then:
+      - logger.log: "Script: set_direction"
+  - id: set_speed
+    parameters:
+      speed: int
+    then:
+      - logger.log: "Script: set_speed"
+  - id: set_thermostat
+    parameters:
+      on: bool
+    then:
+      - logger.log: "Script: set_thermostat"
 
 # Inject IR-encoded TTL signals to the fan
 remote_transmitter:
@@ -18,7 +124,7 @@ remote_transmitter:
     inverted: True
     mode:
       output: True
-      # Open-drain so that native IR still works
+      # Open-drain so that OEM IR still works
       open_drain: True
   carrier_duty_percent: 50%
   non_blocking: True
@@ -26,18 +132,18 @@ remote_transmitter:
 
 # Read IR to capture codes as seen at the fan
 # Bridge to the IR TX pin for bi-directional IR
-#remote_receiver:
-#  pin:
-#    number: GPIO05
-#    inverted: True
-#    mode:
-#      input: True
-#      pullup: False
-#  rmt_symbols: 48
-#  dump: pronto
+remote_receiver:
+  pin:
+    number: GPIO05
+    inverted: True
+    mode:
+      input: True
+      pullup: False
+  rmt_symbols: 48
+  dump: pronto
 
 # Fan main board sends TTL serial to the motor control board
-# Read it so we know the command state of all the motors (and temp mode)
+# Read it so we know the command state of all the motors (and thermostat)
 uart:
   id: uart_motor
   baud_rate: 4800
@@ -47,31 +153,56 @@ uart:
   debug:
     direction: BOTH
     dummy_receiver: True
-    debug_prefix: "Motor "
+    debug_prefix: "UART_Motor "
     after:
       timeout: 15ms
       bytes: 12
     sequence:
       - lambda: |-
           UARTDebug::log_hex(direction, bytes, ' ', debug_prefix);
-
+          // if (! byte_0 == 00 && byte_4 == 18 && byte_6-12 == 18 1E 98 98 98 1E 1E) {
+          //   log: "Skipping invalid sequence: %s";
+          //   return;
+          // }
+          //
+          // bool power = (byte_2 == 98 || byte_2 == 18);
+          // if (power != id(power_sense).state) {
+          //   id(power_sense).publish_state(power);
+          // }
+          //
+          // bool direction = (!power || byte_2 == 1E);
+          // if (direction != id(direction_sense).state) {
+          //   id(direction_sense).publish_state(direction);
+          // }
+          //
+          // bool thermostat = (byte_3 == 18);
+          // if (thermostat != id(thermostat_sense).state) {
+          //   id(thermostat_sense).publish_state(thermostat);
+          // }
+          //
+          // int speed = byte_5 math 18|98|1E|9E
+          // std:string speed_str = std::to_string(speed)
+          // if (speed_str != id(speed_sense).state) {
+          //   id(speed_sense).publish_state(speed_str);
+          // }
+      # Do something to re-sync the fan_cmd mode to fan_sense if it's mismatched for too long
 
 # 12 bytes @ 4800 baud
 # Byte 1 :
 # 	Always:   00
 # Byte 2 Direction:
-# 	Off:		  98/18
-# 	Intake:	  1E
-# 	Exhaust:	9E	
+# 	Off:      98/18
+# 	Intake:   1E
+# 	Exhaust:  9E
 # Byte 3: Thermostat
 # 	On:		    18
 # 	Off:	    1E
 # Byte 4:
-# 	Always:	  18
+# 	Always:   18
 # Byte 5 Speed:
-# 	1:		    18
-# 	2:		    98
-# 	3:		    1E
-# 	4:		    9E
+# 	1:        18
+# 	2:        98
+# 	3:        1E
+# 	4:        9E
 # Bytes 6-12:
 # 	Always:   18 1E 98 98 98 1E 1E
