@@ -85,6 +85,9 @@ globals:
     type: bool
   - id: relay2_default
     type: bool
+  - id: local_call
+    type: bool
+    initial_value: "false"
 
 # Do this when an overload is triggered
 # Called from zi3-current
@@ -122,11 +125,11 @@ binary_sensor:
       inverted: true
     # Toggle if local_control is enabled
     on_press:
-      - if:
-          condition:
-            - lambda: 'return id(local_control);'
-          then:
-            - switch.toggle: relay1
+      - lambda: |-
+          if (!id(local_control)) return;
+          id(local_call) = true;
+          id(relay1).toggle();
+          id(local_call) = false;
     # If the upper button is held for reboot_time, also reboot
     on_multi_click:
       timing:
@@ -156,11 +159,11 @@ binary_sensor:
       mode: INPUT_PULLUP
       inverted: true
     on_press:
-      - if:
-          condition:
-            - lambda: 'return id(local_control);'
-          then:
-            - switch.toggle: relay2
+      - lambda: |-
+          if (!id(local_control)) return;
+          id(local_call) = true;
+          id(relay2).toggle();
+          id(local_call) = false;
 
 output:
   # libretiny_pwm exists but not on these pins
@@ -267,7 +270,7 @@ switch:
     turn_on_action:
       - if:
           condition:
-            - lambda: 'return !id(current_overload) && (id(local_control) || id(remote_control));'
+            - lambda: 'return !id(current_overload) && (id(local_call) || id(remote_control));'
           then:
             - switch.turn_on: relay1_output
           else:
@@ -310,7 +313,7 @@ switch:
     turn_on_action:
       - if:
           condition:
-            - lambda: 'return !id(current_overload) && (id(local_control) || id(remote_control));'
+            - lambda: 'return !id(current_overload) && (id(local_call) || id(remote_control));'
           then:
             - switch.turn_on: relay2_output
           else:
