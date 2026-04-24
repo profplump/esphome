@@ -121,15 +121,15 @@ motor control and UI boards and the connection between them uses a UART link. Th
 back of the UI board. With those two connections it's possible to simulate IR input (and/or read IR ambient signals 
 from the sensor) and to determine the fan state, which allows for closed-loop automation
 
-The device includes a thermostatic mode. This mode can be detected from the UART data when armed but not when triggered, nor 
-can the setpoint and current or temperature cannot be determined. The thermocouple is connected with long wire and would be 
-simple to move to a smarter controller if you wanted to use the fan's existing sensor for a custom thermostatic control
+The device includes a thermostatic mode. That mode can be detected from the UART data when armed but not when triggered, nor 
+can the setpoint or current or temperature be determined. The thermocouple is connected with long wire and would be simple 
+to move to a smarter controller if you wanted to use the fan's existing sensor for a custom thermostatic control
 
-The fan provides 5V power from the motor control board to the UI board, but it needs to drive the whole UI board in addition 
-to any load you add, and there's less than 100 mA available, so it's not enough to run an ESP32 with WiFi. The 100 mA limit 
-comes from the MX2003, a slightly unusual chip that combines an array of darlington transistors (for driving the fan's 
-baffle motor) with a tiny 5V power supply driven from the higher voltage on the motor side of that array. The motor control 
-board generates a higher current 12V supply for the baffle motor and I found plenty for room to stick in my own buck converter to 
-provide more 5V current for the ESP32. There's a big 47Ω resistor next to the MX2003 that you can tap for access to the 12V rail
+The fan provides 5V power from the motor control board to the UI board, but there's less than 100 mA avaiable and it needs 
+to drive the whole UI board in addition to any load you add. The 100 mA limit comes from the MX2003, a slightly unusual chip 
+that combines an array of darlington transistors (for driving the fan's baffle motor) with a tiny 5V power supply driven 
+from the higher voltage on the motor side of that array. The motor control board generates a higher current 12V supply for 
+the baffle motor and I found plenty for room to stick in my own buck converter to provide more 5V current for the ESP32. 
+There's a big 47 Ω resistor next to the MX2003 that you can tap for access to the 12V rail
 
 Example: `fan-office.yaml`
