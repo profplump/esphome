@@ -3,7 +3,7 @@
 substitutions:
   xiao_board: esp32-s3-devkitc-1
   xiao_flash_size: 8MB
-  builtin_mono_name: "Builtin Mono"
+  builtin_mono_name: "Builtin Amber"
   builtin_mono_icon: mdi:head-lightbulb-outline
 
 packages:

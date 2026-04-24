@@ -6,6 +6,7 @@ substitutions:
   builtin_rgb_name: "Builtin RGB"
   builtin_rgb_icon: mdi:head-lightbulb-outline
   builtin_rgb_rmt: 48
+  builtin_rgb_disabled: False
 
 packages:
   esp32: !include zi3-board-esp32.yaml
@@ -20,6 +21,7 @@ light:
     id: builtin_rgb
     name: ${builtin_rgb_name}
     icon: ${builtin_rgb_icon}
+    disabled_by_default: ${builtin_rgb_disabled}
     pin:
       number: GPIO21
     chipset: WS2812
