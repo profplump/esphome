@@ -1,20 +1,21 @@
 # Pinout source: https://www.waveshare.com/wiki/ESP32-S3-ETH
 
 substitutions:
+  esp32_framework_type: esp-idf
   eth_board: esp32-s3-devkitc-1
   eth_flash_size: 16MB
+
+  # Names and icons for HA
   builtin_rgb_name: "Builtin RGB"
   builtin_rgb_icon: mdi:head-lightbulb-outline
+  internal_temp_name: 'Internal Temperature'
+  internal_temp_icon: mdi:oil-temperature
+  internal_temp_interval: 300s
+  restart_name: 'Restart device'
+  restart_icon: mdi:reload
 
 packages:
-  esp32: !include zi3-board-esp32.yaml
   eth: !include zi3-eth.yaml
-  # Only Ethernet or WiFi, not both
-  #wifi: !include zi3-wifi.yaml
-
-esp32:
-  board: ${eth_board}
-  flash_size: ${eth_flash_size}
 
 light:
   - platform: esp32_rmt_led_strip
@@ -25,3 +26,30 @@ light:
     pin: GPIO21
     num_leds: 1
     rgb_order: GRB
+
+# Duplicate the pacakge zi3-board-esp32.yaml, but without any mention of wifi
+# We could build one more layer of indrection but for a single config I'm happy with copy-paste
+esp32:
+  framework:
+    type: ${esp32_framework_type}
+  board: ${eth_board}
+  flash_size: ${eth_flash_size}
+
+sensor:
+  - platform: internal_temperature
+    id: system_internal_temperature
+    name: ${internal_temp_name}
+    icon: ${internal_temp_icon}
+    update_interval: ${internal_temp_interval}
+    entity_category: diagnostic
+    device_class: temperature
+    unit_of_measurement: "°C"
+    disabled_by_default: True
+
+button:
+  - platform: restart
+    id: system_restart
+    name: ${restart_name}
+    icon: ${restart_icon}
+    entity_category: config
+    disabled_by_default: True
