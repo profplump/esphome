@@ -1,0 +1,428 @@
+substitutions:
+  # Timings
+  cmd_timeout: 3000
+  cmd_retry: "333ms"
+  cmd_thermostat_timeout: ${cmd_timeout}
+  cmd_thermostat_retry: "500ms"
+  cmd_thermostat_double: "100ms"
+  sync_timeout: 5
+  power_cmd_delay: 3000
+
+  # Hide some controls for this internal board
+  builtin_rgb_disabled: True
+
+  # Names and icons for HA
+  fan_name: "Fan"
+  fan_icon: mdi:fan
+  power_name: "Power"
+  power_icon: mdi:fan-off
+  reverse_name: "Exhaust"
+  reverse_icon: mdi:diameter-outline
+  speed_name: "Speed"
+  speed_icon: mdi:fan-speed-3
+  thermostat_name: "Thermostat Armed"
+  thermostat_icon: mdi:thermostat-auto
+
+packages:
+  board: !include zi3-board-s3-zero.yaml
+
+# Deal with the slightly insane initial state dynamics of binary_sensor
+# These will be reset to their true values with the next motor UART message
+esphome:
+  on_boot:
+    priority: -100
+    then:
+      - delay: 100ms
+      - lambda: |-
+          id(power_sense).publish_state(false);
+          id(reverse_sense).publish_state(false);
+          id(thermostat_sense).publish_state(false);
+
+globals:
+  - id: cmd_end
+    type: unsigned long
+  - id: last_sync
+    type: unsigned long
+
+# The baked-in fan interfaces speed-count and direction
+fan:
+  - platform: template
+    id: fan_cmd
+    name: ${fan_name}
+    icon: ${fan_icon}
+    has_direction: True
+    speed_count: 4
+    restore_mode: ALWAYS_OFF
+    on_state:
+      - script.execute:
+          id: set_power
+          power_on: !lambda return(x->state);
+    on_speed_set:
+      - script.execute:
+          id: set_speed
+          speed: !lambda return(x);
+    on_direction_set:
+      - script.execute:
+          id: set_reverse
+          reverse: !lambda return (x == FanDirection::REVERSE);
+
+# Map the fan's internal thermostat state
+switch:
+  - platform: template
+    id: thermostat
+    name: ${thermostat_name}
+    icon: ${thermostat_icon}
+    restore_mode: ALWAYS_OFF
+    lambda: return (id(thermostat_sense).state);
+    turn_on_action:
+      then:
+        - script.execute:
+            id: set_thermostat
+            thermostat_on: True
+    turn_off_action:
+      then:
+        - script.execute:
+            id: set_thermostat
+            thermostat_on: False
+
+# Publish the sensed fan state
+# Used internally for state feedback but mostly disabled in HA by default
+binary_sensor:
+  - platform: template
+    id: power_sense
+    name: "${power_name}"
+    icon: ${power_icon}
+    disabled_by_default: True
+  - platform: template
+    id: reverse_sense
+    name: "${reverse_name}"
+    icon: ${reverse_icon}
+  - platform: template
+    id: thermostat_sense
+    name: "${thermostat_name}"
+    icon: ${thermostat_icon}
+    disabled_by_default: True
+sensor:
+  - platform: template
+    id: speed_sense
+    name: "${speed_name}"
+    icon: ${speed_icon}
+  - platform: template
+    id: sync_age
+    name: "${fan_name} Sync Age"
+    icon: mdi:wrench-clock
+    entity_category: diagnostic
+    disabled_by_default: True
+
+# Conditional clicking we need to send IR commands
+script:
+  - id: set_power
+    parameters:
+      power_on: bool
+    then:
+      - logger.log:
+          format: "Script: set_power(%s)"
+          args: ['ONOFF(power_on)']
+      - lambda: id(cmd_end) = millis() + ${cmd_timeout};
+      - while:
+          condition:
+            - lambda: |-
+                return (
+                  id(power_sense).state != power_on &&
+                  id(cmd_end) > millis()
+                );
+          then:
+            - button.press: power_click
+            - delay: ${cmd_retry}
+      # Sync hardware to cmd at power on, but don't wait for it
+      - if:
+          condition:
+            - lambda: return(power_on);
+          then:
+            script.execute:
+              id: sync_to_cmd
+              wait: ${power_cmd_delay}
+
+  # Sync direction to the command state
+  - id: set_reverse
+    parameters:
+      reverse: bool
+    then:
+      - logger.log:
+          format: "Script: set_reverse(%s)"
+          args: ['ONOFF(reverse)']
+      - lambda: id(cmd_end) = millis() + ${cmd_timeout};
+      - while:
+          condition:
+            - lambda: |-
+                return (
+                  id(power_sense).state &&
+                  id(reverse_sense).state != reverse &&
+                  id(cmd_end) > millis()
+                );
+          then:
+            - button.press: reverse_click
+            - delay: ${cmd_retry}
+
+  # Sync speed to the command state
+  - id: set_speed
+    parameters:
+      speed: int
+    then:
+      - logger.log:
+          format: "Script: set_speed(%d)"
+          args: ['speed']
+      - lambda: id(cmd_end) = millis() + ${cmd_timeout};
+      - while:
+          condition:
+            - lambda: |-
+                return (
+                  id(power_sense).state &&
+                  id(speed_sense).state != speed &&
+                  id(cmd_end) > millis()
+                );
+          then:
+            - logger.log:
+                format: "Command: %f, Sense: %f"
+                args: ['speed', 'id(speed_sense).state']
+            - if:
+                condition:
+                  - lambda: return (id(speed_sense).state > speed);
+                then:
+                  - button.press: speed_down_click
+                else:
+                  - button.press: speed_up_click
+            - delay: ${cmd_retry}
+
+  # Sync thermostat to the command state
+  - id: set_thermostat
+    parameters:
+      thermostat_on: bool
+    then:
+      - logger.log:
+          format: "Script: set_thermostat(%s)"
+          args: ['ONOFF(thermostat_on)']
+      - lambda: id(cmd_end) = millis() + ${cmd_thermostat_timeout};
+      - while:
+          condition:
+            - lambda: |-
+                return (
+                  id(power_sense).state &&
+                  id(thermostat_sense).state != thermostat_on &&
+                  id(cmd_end) > millis()
+                );
+          then:
+            - if:
+                condition:
+                  - lambda: return (id(thermostat_sense).state);
+                then:
+                  - button.press: thermostat_click
+                  - delay: ${cmd_thermostat_double}
+                  - button.press: thermostat_click
+                else:
+                  - button.press: thermostat_click
+            - delay: ${cmd_thermostat_retry}
+
+  # Sync speed, direction, and thermostat states to the command state
+  # Called after power-on to activate changes made while off
+  - id: sync_to_cmd
+    parameters:
+      wait: int
+    then:
+      - script.wait: set_power
+      - delay: !lambda return (wait);
+      - script.execute:
+          id: set_speed
+          speed: !lambda return (id(fan_cmd).speed);
+      - script.wait: set_speed
+      - script.execute:
+          id: set_reverse
+          reverse: !lambda return (id(fan_cmd).direction == FanDirection::REVERSE);
+      - script.wait: set_reverse
+      - script.execute:
+          id: set_thermostat
+          thermostat_on: !lambda return (id(thermostat).state);
+      - script.wait: set_thermostat
+
+  # Sync the all command states to the sense states
+  # Wait for any pending commands to avoid race conditions
+  - id: sync_to_sense
+    then:
+      - logger.log: "Syncing fan_cmd to sense"
+      - script.wait: set_power
+      - script.wait: set_speed
+      - script.wait: set_reverse
+      - script.wait: set_thermostat
+      - lambda: |-
+          auto call = id(power_sense).state ? id(fan_cmd).turn_on() : id(fan_cmd).turn_off();
+          call.set_speed(id(speed_sense).state);
+          call.set_direction(id(reverse_sense).state ? FanDirection::REVERSE : FanDirection::FORWARD);
+          call.perform();
+
+# Raw IR command buttons
+# Used internally by the conditional clicker
+# Mostly disabled by default in HA, except for up/down which are used for the (non-smart) thermostat
+button:
+  - platform: template
+    id: power_click
+    name: "${power_name}"
+    disabled_by_default: True
+    on_press:
+      remote_transmitter.transmit_pronto:
+        data: '0000 006D 0030 0000 0031 000F 0031 0010 0010 0031 0030 0012 002F 0012 000F 0032 000F 0032 000F 0032 000F 0032 002F 0012 000F 0032 000F 0134 002F 0012 002F 0012 000F 0032 002F 0012 002F 0012 000F 0032 000F 0032 000F 0032 000F 0032 002F 0012 000F 0032 000F 0134 002F 0012 002F 0012 000F 0032 002F 0012 002F 0012 000F 0032 000F 0032 000F 0032 000F 0032 002F 0012 000F 0032 000F 0134 002F 0012 002F 0012 000F 0032 002F 0012 002F 0012 000F 0032 000F 0032 000F 0032 000F 0032 002F 0012 000F 0032 000F 0181'
+  - platform: template
+    id: reverse_click
+    name: "${reverse_name}"
+    disabled_by_default: True
+    on_press:
+      remote_transmitter.transmit_pronto:
+        data: '0000 006D 0030 0000 0031 0011 0030 0011 0010 0031 0030 0011 0030 0011 0010 0031 0010 0031 0010 0031 0010 0031 0010 0031 0010 0031 0030 0113 0030 0011 0030 0011 0010 0031 0030 0011 0030 0011 0010 0031 0010 0031 0010 0031 0010 0031 0010 0031 0010 0031 0030 0113 0030 0011 0030 0011 0010 0031 0030 0011 0030 0011 0010 0031 0010 0031 0010 0031 0010 0031 0010 0031 0010 0031 0030 0113 0030 0011 0030 0011 0010 0031 0030 0011 0030 0011 0010 0031 0010 0031 0010 0031 0010 0031 0010 0031 0010 0031 0030 0181'
+  - platform: template
+    id: speed_up_click
+    name: "Up"
+    on_press:
+      remote_transmitter.transmit_pronto:
+        data: '0000 006D 0048 0000 0031 000F 0031 0010 0010 0031 0030 0012 002F 0012 002F 0012 000F 0032 000F 0032 000F 0032 002F 0012 002F 0012 000F 0134 002F 0012 002F 0012 000F 0032 002F 0012 002F 0012 002F 0012 000F 0032 000F 0032 000F 0032 002F 0012 002F 0012 000F 0134 002F 0012 002F 0011 000F 0032 002F 0012 002F 0012 002F 0012 000F 0032 000F 0032 000F 0032 002F 0012 002F 0011 000F 0134 002F 0012 002F 0012 000F 0032 002F 0012 002F 0012 002F 0012 000F 0032 000F 0032 000F 0032 002F 0012 002F 0012 000F 0134 002F 0012 002F 0012 000F 0032 002F 0012 002F 0012 002F 0012 000F 0032 000F 0032 000F 0032 002F 0012 002F 0012 000F 0134 002F 0012 002F 0012 000F 0032 002F 0012 002F 0012 002F 0012 000F 0032 000F 0032 000F 0032 002F 0012 002F 0012 000F 0181'
+  - platform: template
+    id: speed_down_click
+    name: "Down"
+    on_press:
+      remote_transmitter.transmit_pronto:
+        data: '0000 006D 0048 0000 0031 000F 0031 0010 0010 0031 0030 0012 002F 0012 000F 0032 000F 0032 000F 0032 000F 0032 000F 0032 002F 0012 000F 0134 002F 0012 002F 0012 000F 0032 002F 0012 002F 0012 000F 0032 000F 0032 000F 0032 000F 0032 000F 0032 002F 0012 000F 0134 002F 0012 002F 0012 000F 0032 002F 0012 002F 0012 000F 0032 000F 0032 000F 0032 000F 0032 000F 0032 002F 0012 000F 0134 002F 0012 002F 0012 000F 0032 002F 0012 002F 0012 000F 0032 000F 0032 000F 0032 000F 0032 000F 0032 002F 0012 000F 0134 002F 0012 002F 0012 000F 0032 002F 0012 002F 0012 000F 0032 000F 0032 000F 0032 000F 0032 000F 0032 002F 0012 000F 0134 002F 0012 002F 0012 000F 0032 002F 0012 002F 0012 000F 0032 000F 0032 000F 0032 000F 0032 000F 0032 002F 0012 000F 0181'
+  - platform: template
+    id: thermostat_click
+    name: "${thermostat_name}"
+    disabled_by_default: True
+    on_press:
+      remote_transmitter.transmit_pronto:
+        data: '0000 006D 0024 0000 0031 000F 0031 000F 0011 0030 0031 0010 0031 0010 0031 0010 0011 0030 0011 0030 0011 0030 0011 0030 0031 0010 0031 0112 0031 0010 0031 0010 0011 0030 0031 0010 0031 0010 0032 000F 0011 0030 0011 0030 0011 0030 0011 0030 0031 0010 0031 0112 0031 0010 0031 0010 0011 0030 0031 0010 0031 0010 0031 0010 0011 0030 0011 0030 0011 0030 0011 0030 0031 0010 0031 0181'
+
+# Inject IR-encoded TTL signals to the fan
+remote_transmitter:
+  pin:
+    number: GPIO04
+    inverted: True
+    mode:
+      output: True
+      # Open-drain so the physical IR reciever still works
+      open_drain: True
+  carrier_duty_percent: 50%
+  non_blocking: True
+  rmt_symbols: 48
+
+# Read IR to capture codes as seen at the fan
+# Bridge to the IR TX pin for bi-directional IR
+remote_receiver:
+  pin:
+    number: GPIO05
+    inverted: True
+    mode:
+      input: True
+      pullup: False
+  rmt_symbols: 48
+  dump: pronto
+
+# Fan main board sends TTL serial to the motor control board
+# Read it so we know the command state of all the motors (and thermostat)
+uart:
+  id: uart_motor
+  baud_rate: 4800
+  rx_pin:
+    number: GPIO06
+    inverted: False
+  debug:
+    direction: BOTH
+    dummy_receiver: True
+    debug_prefix: "UART_Motor "
+    after:
+      timeout: 10ms
+      bytes: 13
+    sequence:
+      - lambda: |-
+          // Skip (and log) invalid reads
+          if (
+            bytes.size() != 13 ||
+            bytes[0] != 0x00 ||
+            bytes[3] != 0x18 ||
+            bytes[5] != 0x18 || bytes[6] != 0x18 ||
+              bytes[7] != 0x1E || bytes[8] != 0x18 ||
+              bytes[9] != 0x98 || bytes[10] != 0x98 ||
+              bytes[11] != 0x1E || bytes[12] != 0x1E
+          ) {
+            UARTDebug::log_hex(direction, bytes, ' ', debug_prefix);
+            return;
+          }
+
+          // Power and reverse from byte 1
+          id(power_sense).publish_state(!(bytes[1] == 0x98 || bytes[1] == 0x18));
+          if (id(power_sense).state) {
+            id(reverse_sense).publish_state(bytes[1] == 0x9E);
+          } else {
+            id(reverse_sense).publish_state(id(fan_cmd).direction == FanDirection::REVERSE);
+          }
+
+          // Thermostat from byte 2
+          id(thermostat_sense).publish_state(bytes[2] == 0x18);
+
+          // Speed from bytes 4
+          int speed = 0;
+          switch (bytes[4]) {
+            case 0x18:
+              speed = 1;
+              break;
+            case 0x98:
+              speed = 2;
+              break;
+            case 0x1E:
+              speed = 3;
+              break;
+            case 0x9E:
+              speed = 4;
+              break;
+            default:
+              UARTDebug::log_hex(direction, bytes, ' ', debug_prefix);
+              return;
+          }
+          if (std::isnan(id(speed_sense).state) || id(speed_sense).state != speed) {
+            id(speed_sense).publish_state(speed);
+          }
+
+          // Check for fan_cmd sync
+          if (
+            id(fan_cmd).state == id(power_sense).state &&
+            id(fan_cmd).speed == id(speed_sense).state &&
+            (id(fan_cmd).direction == FanDirection::REVERSE) == id(reverse_sense).state
+          ) {
+            id(last_sync) = millis();
+          }
+          int age = (millis() - id(last_sync)) / 1000;
+          if (age != id(sync_age).state) {
+            id(sync_age).publish_state(age);
+            if (age > ${sync_timeout}) {
+              if (!id(sync_to_sense).is_running()) {
+                id(sync_to_sense).execute();
+              }
+            }
+          }
+
+# 13 bytes @ 4800 baud
+# 00 9E 1E 18 98 18 18 1E 18 98 98 1E 1E
+# Power: On, Direction: Intake, Thermostat: On, Speed: 2
+# Byte 0 :
+# 	Always:   00
+# Byte 1 Power/Reverse:
+# 	Off:      98/18
+# 	Intake:   1E
+# 	Exhaust:  9E
+# Byte 2: Thermostat
+# 	Armed:		18
+# 	Off:	    1E
+# Byte 3:
+# 	Always:   18
+# Byte 4 Speed:
+# 	1:        18
+# 	2:        98
+# 	3:        1E
+# 	4:        9E
+# Bytes 5-12:
+#   Always:   18 18 1E 18 98 98 1E 1E
