@@ -6,8 +6,23 @@ substitutions:
   ap_key: !secret ap-av-hdmi-switch
   c3_board: seeed_xiao_esp32c3
 
+  # Save the at-boot config, default to OFF if config lost
+  autoswitch_boot_restore: RESTORE_DEFAULT_OFF
+  # Save the at-boot config, default to "1" if config lost
+  hdmi_input_boot_default: "1"
+
+  # Names and icons for HA
+  input_icon: mdi:hdmi-port
+  autoswitch_name: "Auto Switch"
+  autoswitch_icon: mdi:auto-fix
+  active_name: "Active"
+  active_icon: mdi:vector-point-select
+  ready_name: "Available"
+  ready_icon: mdi:led-on
   hdmi_name: "HDMI Input"
   hdmi_icon: mdi:video-input-hdmi
+  boot_name: "State at Boot"
+  boot_icon: mdi:toggle-switch
 
 packages:
   ap: !include zi3-ap.yaml
@@ -16,13 +31,27 @@ packages:
 
 esphome:
   on_boot:
-  # Sync hardware to input 1, auto-switch disabled @ early boot
-  - priority: 600
+  # Sync hardware to the input & autoswitch defaults @ late boot
+  - priority: 100
     then:
-      - switch.turn_off: autoswitch
+      - if:
+          condition:
+            - switch.is_on: autoswitch_boot
+          then:
+            - switch.turn_on: autoswitch
+          else:
+            - switch.turn_off: autoswitch
       - select.set:
           id: hdmi_input
-          option: "1"
+          option: !lambda return esphome::to_string(id(input_default));
+
+globals:
+  - id: autoswitch_default
+    type: bool
+  - id: input_default
+    type: int
+    initial_value: ${hdmi_input_boot_default}
+    restore_value: True
 
 uart:
   id: uart_hdmi
@@ -31,19 +60,21 @@ uart:
     number: GPIO10
   tx_pin:
     number: GPIO09
-    ignore_strapping_warning: true
+    #ignore_strapping_warning: True
   debug:
     direction: BOTH
-    dummy_receiver: true
+    dummy_receiver: True
     debug_prefix: "HDMI_UART "
     sequence:
       - lambda: |-
           UARTDebug::log_string(direction, bytes, debug_prefix);
 
 switch:
+  # Auto-switching (i.e. select the most recently activated input)
   - platform: template
     id: autoswitch
-    name: "Auto Switch"
+    name: ${autoswitch_name}
+    icon: ${autoswitch_icon}
     restore_mode: ALWAYS_OFF
     lambda: 'return id(autoswitch).state;'
     turn_on_action: 
@@ -56,7 +87,22 @@ switch:
         - script.execute:
             id: auto_enable
             enable: False
+  # Auto-switching boot config
+  - platform: template
+    id: autoswitch_boot
+    name: "${boot_name} - ${autoswitch_name}"
+    icon: ${boot_icon}
+    entity_category: config
+    restore_mode: ${autoswitch_boot_restore}
+    lambda: 'return id(autoswitch_default);'
+    turn_on_action:
+      - logger.log: "${boot_name} - ${autoswitch_name}: On"
+      - lambda: 'id(autoswitch_default) = true;'
+    turn_off_action:
+      - logger.log: "${boot_name} - ${autoswitch_name}: Off"
+      - lambda: 'id(autoswitch_default) = false;'
 
+# Manual switching
 select:
   - platform: template
     id: hdmi_input
@@ -71,11 +117,92 @@ select:
     set_action: 
       then:
         - script.execute:
-            id: input_swtich
+            id: input_switch
             opt_value: !lambda return x;
+  - platform: template
+    id: hdmi_input_boot
+    name: "${boot_name} - ${hdmi_name}"
+    icon: ${boot_icon}
+    lambda: return esphome::to_string(id(input_default));
+    options:
+      - "1"
+      - "2"
+      - "3"
+      - "4"
+    set_action:
+      then:
+        - lambda: id(input_default) = std::atoi(x.c_str());
+
+# Combine all the active sensors into a single value
+sensor:
+  - platform: binary_sensor_map
+    id: active_input
+    name: "${active_name} ${hdmi_name}"
+    icon: ${hdmi_icon}
+    type: sum
+    channels:
+      - binary_sensor: active_1
+        value: 1
+      - binary_sensor: active_2
+        value: 2
+      - binary_sensor: active_3
+        value: 3
+      - binary_sensor: active_4
+        value: 4
+
+# Read the individual ready and active lights from each input channel
+# Active sensors are internal-only; we publish the binary sensor map instead
+binary_sensor:
+  - platform: gpio
+    id: active_1
+    internal: True
+    pin:
+      number: GPIO01
+  - platform: gpio
+    id: active_2
+    internal: True
+    pin:
+      number: GPIO02
+      #ignore_strapping_warning: True
+  - platform: gpio
+    id: active_3
+    internal: True
+    pin:
+      number: GPIO03
+  - platform: gpio
+    id: active_4
+    internal: True
+    pin:
+      number: GPIO04
+  - platform: gpio
+    id: ready_1
+    name: "1 ${ready_name}"
+    icon: ${ready_icon}
+    pin:
+      number: GPIO05
+  - platform: gpio
+    id: ready_2
+    name: "2 ${ready_name}"
+    icon: ${ready_icon}
+    pin:
+      number: GPIO06
+  - platform: gpio
+    id: ready_3
+    name: "3 ${ready_name}"
+    icon: ${ready_icon}
+    pin:
+      number: GPIO07
+  - platform: gpio
+    id: ready_4
+    name: "4 ${ready_name}"
+    icon: ${ready_icon}
+    pin:
+      number: GPIO08
+      #ignore_strapping_warning: True
 
 script:
-  - id: input_swtich
+  # Select the HDMI input by index
+  - id: input_switch
     mode: queued
     parameters:
       opt_value: string
@@ -85,6 +212,7 @@ script:
       - uart.write: !lambda return { opt_value.data()[0] };
       - uart.write: "\r\n"
       - lambda: id(hdmi_input).publish_state(opt_value);
+  # Enable/disable auto-swtiching
   - id: auto_enable
     mode: queued
     parameters:
@@ -110,7 +238,7 @@ button:
     name: "${hdmi_name} 1"
     on_press:
       - script.execute: 
-          id: input_swtich
+          id: input_switch
           opt_value: "1"
     disabled_by_default: True
   - platform: template
@@ -118,7 +246,7 @@ button:
     name: "${hdmi_name} 2"
     on_press:
       - script.execute: 
-          id: input_swtich
+          id: input_switch
           opt_value: "2"
     disabled_by_default: True
   - platform: template
@@ -126,7 +254,7 @@ button:
     name: "${hdmi_name} 3"
     on_press:
       - script.execute: 
-          id: input_swtich
+          id: input_switch
           opt_value: "3"
     disabled_by_default: True
   - platform: template
@@ -134,7 +262,7 @@ button:
     name: "${hdmi_name} 4"
     on_press:
       - script.execute: 
-          id: input_swtich
+          id: input_switch
           opt_value: "4"
     disabled_by_default: True
   - platform: template
