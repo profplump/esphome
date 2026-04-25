@@ -132,5 +132,5 @@ from the higher voltage on the motor side of that array. The motor control board
 the baffle motor and I found plenty for room to stick in my own buck converter to provide more 5V current for the ESP32. 
 There's a big 47 Ω resistor next to the MX2003 that you can tap for access to the 12V rail
 
-Example: `fan-office.yaml`
+Example: `fan-office.yaml` \
 Library: `zi3-fan-transom.yaml`
