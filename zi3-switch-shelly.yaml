@@ -127,7 +127,9 @@ switch:
             - logger.log: "${relay1_name}: Disabled"
   - platform: gpio
     id: relay1_output
-    pin: GPIO04
+    pin:
+      number: GPIO04
+      ignore_strapping_warning: True
     internal: True
     restore_mode: ${relay1_restore}
 
