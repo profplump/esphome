@@ -7,6 +7,7 @@ substitutions:
   cmd_thermostat_double: "100ms"
   sync_timeout: 5
   power_cmd_delay: 3000
+  diag_resolution: 5000
 
   # Hide some controls for this internal board
   builtin_rgb_disabled: True
@@ -110,6 +111,12 @@ sensor:
   - platform: template
     id: sync_age
     name: "${fan_name} Sync Age"
+    icon: mdi:wrench-clock
+    entity_category: diagnostic
+    disabled_by_default: True
+  - platform: template
+    id: last_uart
+    name: "Last UART"
     icon: mdi:wrench-clock
     entity_category: diagnostic
     disabled_by_default: True
@@ -368,7 +375,6 @@ uart:
             }
 
             // Thermostat from byte 2
-            UARTDebug::log_hex(direction, bytes, ' ', debug_prefix);
             id(thermostat_sense).publish_state(bytes[2] == 0x18);
 
             // Speed from byte 4
@@ -443,15 +449,24 @@ uart:
             return;
           }
 
+          // Diagnostics
+          unsigned long now = millis();
+          {
+            int secs = now / ${diag_resolution};
+            if (id(last_uart).state != secs) {
+              id(last_uart).publish_state(secs);
+            }
+          }
+
           // Check for (and eventually resolve) fan_cmd sync
           if (
             id(fan_cmd).state == id(power_sense).state &&
             id(fan_cmd).speed == id(speed_sense).state &&
             (id(fan_cmd).direction == FanDirection::REVERSE) == id(reverse_sense).state
           ) {
-            id(last_sync) = millis();
+            id(last_sync) = now;
           }
-          int age = (millis() - id(last_sync)) / 1000;
+          int age = (now - id(last_sync)) / 1000;
           if (age != id(sync_age).state) {
             id(sync_age).publish_state(age);
             if (age > ${sync_timeout}) {
