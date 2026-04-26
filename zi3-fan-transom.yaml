@@ -336,58 +336,114 @@ uart:
     debug_prefix: "UART_Motor "
     after:
       timeout: 10ms
-      bytes: 13
+      # Different revisions of this fan use different UART message formats
+      # They are all delimited with the sequence 0x98 0x98 0x1E 0x1E
+      delimiter:
+        - 152
+        - 152
+        - 30
+        - 30
     sequence:
       - lambda: |-
-          // Skip (and log) invalid reads
+          bool err = true;
+
+          // 13-byte message
           if (
-            bytes.size() != 13 ||
-            bytes[0] != 0x00 ||
-            bytes[3] != 0x18 ||
-            bytes[5] != 0x18 || bytes[6] != 0x18 ||
-              bytes[7] != 0x1E || bytes[8] != 0x18 ||
-              bytes[9] != 0x98 || bytes[10] != 0x98 ||
-              bytes[11] != 0x1E || bytes[12] != 0x1E
+            bytes.size() == 13 &&
+            bytes[0] == 0x00 && bytes[3] == 0x18 &&
+            bytes[5] == 0x18 && bytes[6] == 0x18 &&
+            bytes[7] == 0x1E && bytes[8] == 0x18 &&
+            bytes[9] == 0x98 && bytes[10] == 0x98 &&
+            bytes[11] == 0x1E && bytes[12] == 0x1E
           ) {
+            // Valid parse
+            err = false;
+
+            // Power and reverse from byte 1
+            id(power_sense).publish_state(!(bytes[1] == 0x98 || bytes[1] == 0x18));
+            if (id(power_sense).state) {
+              id(reverse_sense).publish_state(bytes[1] == 0x9E);
+            } else {
+              id(reverse_sense).publish_state(id(fan_cmd).direction == FanDirection::REVERSE);
+            }
+
+            // Thermostat from byte 2
+            UARTDebug::log_hex(direction, bytes, ' ', debug_prefix);
+            id(thermostat_sense).publish_state(bytes[2] == 0x18);
+
+            // Speed from byte 4
+            int speed = 0;
+            switch (bytes[4]) {
+              case 0x18:
+                speed = 1;
+                break;
+              case 0x98:
+                speed = 2;
+                break;
+              case 0x1E:
+                speed = 3;
+                break;
+              case 0x9E:
+                speed = 4;
+                break;
+            }
+            if (id(speed_sense).state != speed) {
+              id(speed_sense).publish_state(speed);
+            }
+
+          // 17-byte message
+          } else if (
+            bytes.size() == 17 &&
+            bytes[0] == 0x98 && bytes[1] == 0xF8 &&
+            bytes[4] == 0x98 && bytes[6] == 0x9E &&
+            bytes[7] == 0x18 && bytes[8] == 0x18 &&
+            bytes[9] == 0x9E && bytes[10] == 0x98 &&
+            bytes[11] == 0x18 && bytes[12] == 0x9E &&
+            bytes[13] == 0x98 && bytes[14] == 0x98 &&
+            bytes[15] == 0x1E && bytes[16] == 0x1E    
+          ) {
+            // Valid parse
+            err = false;
+
+            // Power and reverse from byte 2
+            id(power_sense).publish_state(!(bytes[2] == 0x98 || bytes[2] == 0x18));
+            if (id(power_sense).state) {
+              id(reverse_sense).publish_state(bytes[2] == 0x1E);
+            } else {
+              id(reverse_sense).publish_state(id(fan_cmd).direction == FanDirection::REVERSE);
+            }
+
+            // Thermostat from byte 3
+            id(thermostat_sense).publish_state(bytes[3] == 0x1E);
+
+            // Speed from byte 5
+            int speed = 0;
+            switch (bytes[5]) {
+              case 0x18:
+                speed = 1;
+                break;
+              case 0x98:
+                speed = 2;
+                break;
+              case 0x1E:
+                speed = 3;
+                break;
+              case 0x9E:
+                speed = 4;
+                break;
+            }
+            if (id(speed_sense).state != speed) {
+              id(speed_sense).publish_state(speed);
+            }
+          }
+
+          // Skip and log invalid reads
+          if (err) {
             UARTDebug::log_hex(direction, bytes, ' ', debug_prefix);
             return;
           }
 
-          // Power and reverse from byte 1
-          id(power_sense).publish_state(!(bytes[1] == 0x98 || bytes[1] == 0x18));
-          if (id(power_sense).state) {
-            id(reverse_sense).publish_state(bytes[1] == 0x9E);
-          } else {
-            id(reverse_sense).publish_state(id(fan_cmd).direction == FanDirection::REVERSE);
-          }
-
-          // Thermostat from byte 2
-          id(thermostat_sense).publish_state(bytes[2] == 0x18);
-
-          // Speed from bytes 4
-          int speed = 0;
-          switch (bytes[4]) {
-            case 0x18:
-              speed = 1;
-              break;
-            case 0x98:
-              speed = 2;
-              break;
-            case 0x1E:
-              speed = 3;
-              break;
-            case 0x9E:
-              speed = 4;
-              break;
-            default:
-              UARTDebug::log_hex(direction, bytes, ' ', debug_prefix);
-              return;
-          }
-          if (std::isnan(id(speed_sense).state) || id(speed_sense).state != speed) {
-            id(speed_sense).publish_state(speed);
-          }
-
-          // Check for fan_cmd sync
+          // Check for (and eventually resolve) fan_cmd sync
           if (
             id(fan_cmd).state == id(power_sense).state &&
             id(fan_cmd).speed == id(speed_sense).state &&
@@ -405,9 +461,31 @@ uart:
             }
           }
 
+# 17 bytes @ 4800 baud
+# 98 F8 1E 18 98 18 9E 18 18 9E 98 18 9E 98 98 1E 1E
+# Power: On, Direction: Exhaust, Thermostat: Off, Speed: 1
+# Byte 0-1 :
+# 	Always:   98 F8
+# Byte 2 Power/Reverse:
+# 	Off:      98/18
+# 	Intake:   9E
+# 	Exhaust:  1E
+# Byte 3: Thermostat
+# 	Armed:		1E
+# 	Off:	    18
+# Byte 4:
+# 	Always:   98
+# Byte 5 Speed:
+# 	1:        18
+# 	2:        98
+# 	3:        1E
+# 	4:        9E
+# Bytes 6-16:
+#   Always:   9E 18 18 9E 98 18 9E 98 98 1E 1E
+
 # 13 bytes @ 4800 baud
 # 00 9E 1E 18 98 18 18 1E 18 98 98 1E 1E
-# Power: On, Direction: Intake, Thermostat: On, Speed: 2
+# Power: On, Direction: Intake, Thermostat: Armed, Speed: 2
 # Byte 0 :
 # 	Always:   00
 # Byte 1 Power/Reverse:

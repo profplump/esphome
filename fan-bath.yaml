@@ -1,0 +1,11 @@
+substitutions:
+  name: esp32-fan-bath
+  friendly_name: "Fan - Bath"
+  api_key: !secret api-fan-bath
+  ota_key: !secret ota-fan-bath
+  ap_key: !secret ap-fan-bath
+
+packages:
+  ap: !include zi3-ap.yaml
+  base: !include zi3-base.yaml
+  shelly: !include zi3-fan-transom.yaml
