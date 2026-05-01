@@ -8,6 +8,12 @@ substitutions:
   builtin_mono_name: "Builtin Mono"
   builtin_mono_icon: mdi:head-lightbulb-outline
 
+  # Lamp constants
+  builtin_mono_min: 0.01
+  builtin_red_min: 0.01
+  builtin_green_min: 0.01
+  builtin_blue_min: 0.01
+
 packages:
   esp32: !include zi3-board-esp32.yaml
   wifi: !include zi3-wifi.yaml
@@ -21,34 +27,78 @@ light:
     id: builtin_rgb
     name: ${builtin_rgb_name}
     icon: ${builtin_rgb_icon}
-    red: builtin_red
-    green: builtin_green
-    blue: builtin_blue
+    red: builtin_red_lamp
+    green: builtin_green_lamp
+    blue: builtin_blue_lamp
   - platform: monochromatic
     id: builtin_mono
-    output: builtin_sck
     name: ${builtin_mono_name}
     icon: ${builtin_mono_icon}
+    output: builtin_mono_lamp
 
 output:
   - platform: ledc
-    id: builtin_sck
+    id: builtin_mono_led
+    # This is also the SCK line
     pin: GPIO48
+  - platform: template
+    type: float
+    id: builtin_mono_lamp
+    write_action:
+      then:
+        - output.set_level:
+            id: builtin_mono_led
+            level: !lambda |-
+              float k = (1.0f - ${builtin_mono_min}f) / 0.99f;
+              return (state > 0.0f) ? (k * state) + ${builtin_mono_min} : 0.0f;
+
   - platform: ledc
-    id: builtin_blue
+    id: builtin_blue_led
     pin:
       number: GPIO45
       ignore_strapping_warning: True
     inverted: True
+  - platform: template
+    type: float
+    id: builtin_blue_lamp
+    write_action:
+      then:
+        - output.set_level:
+            id: builtin_blue_led
+            level: !lambda |-
+              float k = (1.0f - ${builtin_blue_min}f) / 0.99f;
+              return (state > 0.0f) ? (k * state) + ${builtin_blue_min} : 0.0f;
+
   - platform: ledc
-    id: builtin_red
+    id: builtin_red_led
     pin:
       number: GPIO46
       ignore_strapping_warning: True
     inverted: True
+  - platform: template
+    type: float
+    id: builtin_red_lamp
+    write_action:
+      then:
+        - output.set_level:
+            id: builtin_red_led
+            level: !lambda |-
+              float k = (1.0f - ${builtin_red_min}f) / 0.99f;
+              return (state > 0.0f) ? (k * state) + ${builtin_red_min} : 0.0f;
+
   - platform: ledc
-    id: builtin_green
+    id: builtin_green_led
     pin:
       number: GPIO0
       ignore_strapping_warning: True
     inverted: True
+  - platform: template
+    type: float
+    id: builtin_green_lamp
+    write_action:
+      then:
+        - output.set_level:
+            id: builtin_green_led
+            level: !lambda |-
+              float k = (1.0f - ${builtin_green_min}f) / 0.99f;
+              return (state > 0.0f) ? (k * state) + ${builtin_green_min} : 0.0f;
