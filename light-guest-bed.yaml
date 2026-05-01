@@ -468,12 +468,12 @@ external_components:
 # Pin 5 - Touch color
 # Pin 6 - Touch bright 1
 # Pin 7 - N/C?
-# Pin 8 - Ground
-# Pin 9 - Touch bright 3
-# Pin 10 - Touch bright 2
-# Pin 11 - Timer green (low)
-# Pin 12 - Timer blue (low)
-# Pin 13 - 3.3V
-# Pin 14 - N/C?
-# Pin 15 - 3k PWM
-# Pin 16 - 5k PWM
+# Pin 8 - 5k PWM
+# Pin 9 - 3k PWM
+# Pin 10 - N/C?
+# Pin 11 - 3.3V
+# Pin 12 - Timer blue (inverted)
+# Pin 13 - Timer green (inverted)
+# Pin 14 - Touch bright 2
+# Pin 15 - Touch bright 3
+# Pin 16 - Ground
