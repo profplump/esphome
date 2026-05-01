@@ -147,6 +147,8 @@ sensor:
     icon: ${input_icon}
     type: sum
     accuracy_decimals: 0
+    filters:
+      - round: 0
     channels:
       - binary_sensor: active_1
         value: 1
