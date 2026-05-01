@@ -134,3 +134,25 @@ There's a big 47 Ω resistor next to the MX2003 that you can tap for access to t
 
 Example: `fan-office.yaml` \
 Library: `zi3-fan-transom.yaml`
+
+## AFROG Desk Lamp
+
+The [AFROG 2th Gen Multifunctional LED Desk Lamp With Wireless 
+Charger](https://www.afroghome.com/products/afrog-multifunctional-led-desk-lamp-with-wireless-charger) is a (micro) USB-powered desk lamp with touch 
+controls for cool and warm light options, fine-grained dimming, a sleep timer, wireless charging and a USB-A power port. It has small green and blue 
+LEDs inside the timer touch control, and red and blue LEDs along the right side
+
+The hardware and interface are mostly pretty good. The dimmer control has touch 5 pads and can blend so brightness control is fairly fine-grained. On my 
+particular lamp the 4th brightness pad is busted, but I suspect that's an individual failure and not a design problem. The wireless charger is not 
+great, but it does work, and I'm told later models include a different charger. The wireless charger is an indepedent circuit board connected only to 
+power and the charge coil, so it would be easy to replace if you desired
+
+In total there are 8 touch pads inputs (5 brightness, power, color and timer), cool and warm LED outputs, mutually-exclusive inverted outputs for the 
+green and blue LEDs, and red and blue LEDs on (and indendently controlled by) charging board. The main control chip and LEDs all run at 3.3V, and have 
+transistor-switched outputs for the main white lamps, so it's easy to drive everything directly. I did not check the 3.3V power rating as there is 
+already 5V power from the USB input, which should be sufficient for any controller. There's lots of empty space inside the case (take out 5 screws from 
+the metal plate under the adhesive foot pad), and the case itself is translucent black so that LEDs can be seen from inside. I used a Waveshare 
+ESP32-S3-Nano as a controller and you can easily see the onboard RGB and red LEDs through the case. Be aware that the metal backing (and charging 
+devices on top) can interfere with WiFi and other signals, so you may need careful antenna positioning or an external antenna
+
+Example: `light-guest-bed.yaml`
