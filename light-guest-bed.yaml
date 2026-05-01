@@ -1,0 +1,479 @@
+substitutions:
+  name: esp32-light-guest-bed
+  friendly_name: Light - Guest - Bed
+  api_key: !secret api-light-guest-bed
+  ota_key: !secret ota-light-guest-bed
+  ap_key: !secret ap-light-guest-bed
+
+  # Touch tuning
+  touch_threshold: 1500
+  touch_threshold_high: 14750
+  touch_measurement: "250us"
+  touch_sleep: "1ms"
+  touch_debug: False
+
+  # Power-on defaults
+  default_color: "4540 K"
+  default_brightness: "100%"
+  default_on: "false"
+  default_rgb_brightness: "75%"
+
+  # White lamp constants
+  white_gamma: 3.4
+  white_cool_temp: 5000
+  white_warm_temp: 2700
+  white_transition: "333ms"
+  white_color_steps: 5
+  cool_white_min: 0.0002
+  warm_white_min: 0.0002
+
+  # Blue/green lamp constants
+  green_min: 0.003
+  green_transition: "333ms"
+  blue_min: 0.003
+  blue_transition: ${green_transition}
+
+  # Timer constants
+  timer_minutes: 30
+  timer_transition: "60s"
+
+  # Override s3-nano package config
+  builtin_rgb_name: "Internal RGB"
+  builtin_rgb_icon: mdi:head-lightbulb-outline
+  builtin_red_min: 0.01
+  builtin_green_min: 0.01
+  builtin_blue_min: 0.01
+  builtin_mono_name: "Internal Red"
+  builtin_mono_icon: mdi:head-lightbulb-outline
+  builtin_mono_min: 0.01
+
+  # Names and icons for HA
+  white_name: "Lamp"
+  white_icon: mdi:desk-lamp
+  power_name: "Power"
+  power_icon: mdi:gesture-tap
+  color_name: "Color Temperature"
+  color_icon: ${power_icon}
+  timer_name: "Timer"
+  timer_icon: ${power_icon}
+  bright_name: "Brightness"
+  bright_icon: mdi:lightbulb-on
+  bright1_name: "${bright_name} 1"
+  bright1_icon: "${bright_icon}-10"
+  bright2_name: "${bright_name} 2"
+  bright2_icon: "${bright_icon}-30"
+  bright3_name: "${bright_name} 3"
+  bright3_icon: "${bright_icon}-50"
+  bright4_name: "${bright_name} 4"
+  bright4_icon: "${bright_icon}-70"
+  bright5_name: "${bright_name} 5"
+  bright5_icon: "${bright_icon}-90"
+  charge_name: "Wireless Charging"
+  charge_icon: mdi:battery-charging-wireless
+  blue_name: "Timer Blue"
+  blue_icon: mdi:led-off
+  green_name: "Timer Green"
+  green_icon: mdi:led-outline
+  defaults_name: "Defaults"
+  defaults_icon: mdi:lightbulb-auto
+  all_off_name: "All Off"
+  all_off_icon: mdi:toggle-switch-off
+
+packages:
+  ap: !include zi3-ap.yaml
+  base: !include zi3-base.yaml
+  board: !include zi3-board-s3-nano.yaml
+
+esphome:
+  on_boot:
+  # Set defaults @ early boot
+  - priority: 600
+    then:
+      - script.execute: defaults
+
+# User light controls
+light:
+  # Main dual-white lamp
+  - platform: cwww
+    id: light_white
+    name: ${white_name}
+    icon: ${white_icon}
+    cold_white: cool_white_lamp
+    warm_white: warm_white_lamp
+    cold_white_color_temperature: ${white_cool_temp} K
+    warm_white_color_temperature: ${white_warm_temp} K
+    restore_mode: ALWAYS_OFF
+    gamma_correct: ${white_gamma}
+    default_transition_length: ${white_transition}
+    effects:
+      - flicker:
+      - strobe:
+      - pulse:
+    on_turn_off: 
+      then:
+        - if:
+            condition:
+              - script.is_running: timer
+            then:
+              - script.stop: timer
+              - light.turn_on:
+                  id: light_green
+                  effect: none
+              - light.turn_off: light_green
+
+  # Green Timer LED
+  - platform: monochromatic
+    id: light_green
+    name: ${green_name}
+    icon: ${green_icon}
+    output: green_lamp
+    restore_mode: ALWAYS_OFF
+    default_transition_length: ${green_transition}
+    effects:
+      - flicker:
+      - strobe:
+      - pulse:
+    # The timer LEDs are mutually exclusive
+    on_turn_on: 
+      then:
+        - light.turn_off: light_blue
+
+  # Blue Timer LED
+  - platform: monochromatic
+    id: light_blue
+    name: ${blue_name}
+    icon: ${blue_icon}
+    output: blue_lamp
+    restore_mode: ALWAYS_OFF
+    default_transition_length: ${blue_transition}
+    effects:
+      - flicker:
+      - strobe:
+      - pulse:
+    # The timer LEDs are mutually exclusive
+    on_turn_on: 
+      then:
+        - light.turn_off: light_green
+
+  # Fancy effects for the internal RGB
+  - id: !extend builtin_rgb
+    effects:
+      - random:
+      - flicker:
+      - strobe:
+      - pulse:
+
+# LEDs and their scalers
+output:
+  - platform: ledc
+    id: cool_white_led
+    pin:
+      number: GPIO14
+  - platform: template
+    type: float
+    id: cool_white_lamp
+    write_action: 
+      then:
+        - output.set_level:
+            id: cool_white_led
+            level: !lambda |-
+              float k = (1.0f - ${cool_white_min}f) / 0.99f;
+              return (state > 0.0f) ? (k * state) + ${cool_white_min} : 0.0f;
+
+  - platform: ledc
+    id: warm_white_led
+    pin:
+      number: GPIO13
+  - platform: template
+    type: float
+    id: warm_white_lamp
+    write_action: 
+      then:
+        - output.set_level:
+            id: warm_white_led
+            level: !lambda |-
+              float k = (1.0f - ${warm_white_min}f) / 0.99f;
+              return (state > 0.0f) ? (k * state) + ${warm_white_min} : 0.0f;
+
+  - platform: ledc
+    id: blue_led
+    pin:
+      number: GPIO12
+      inverted: True
+  - platform: template
+    type: float
+    id: blue_lamp
+    write_action: 
+      then:
+        - output.set_level:
+            id: blue_led
+            level: !lambda |-
+              float k = (1.0f - ${blue_min}f) / 0.99f;
+              return (state > 0.0f) ? (k * state) + ${blue_min} : 0.0f;
+
+  - platform: ledc
+    id: green_led
+    pin:
+      number: GPIO11
+      inverted: True
+  - platform: template
+    type: float
+    id: green_lamp
+    write_action: 
+      then:
+        - output.set_level:
+            id: green_led
+            level: !lambda |-
+              float k = (1.0f - ${green_min}f) / 0.99f;
+              return (state > 0.0f) ? (k * state) + ${green_min} : 0.0f;
+
+sensor:
+  # Average all active brightness sensors
+  # This allows smooth blends when adjacent touch pads are both active
+  - platform: binary_sensor_map
+    id: brightness_map
+    name: ${bright_name}
+    icon: ${bright_icon}
+    type: group
+    filters:
+      - round_to_multiple_of: 10
+    accuracy_decimals: 0
+    channels:
+      - binary_sensor: touch_bright1
+        value: 40
+      - binary_sensor: touch_bright2
+        value: 60
+      - binary_sensor: touch_bright3
+        value: 80
+      - binary_sensor: touch_bright4
+        value: 90
+      - binary_sensor: touch_bright5
+        value: 100
+    on_value:
+      then:
+        - if:
+            all:
+              - light.is_on: light_white
+              - lambda: return (x >= 1 && x <= 100);
+            then:
+              - light.control:
+                  id: light_white
+                  brightness: !lambda return ((float)x / 100.0f);
+
+  # Wireless charging LED
+  # This requires an ADC channel because it floats as high as 0.8V when off
+  # - platform: adc
+  #   id: charge_led
+  #   name: ${charge_name}
+  #   icon: ${charge_icon}
+  #   pin: GPIO21
+  #   update_interval: 15s
+  #   disabled_by_default: True
+
+button:
+  - platform: template
+    id: defaults_button
+    name: "${defaults_name}"
+    on_press: 
+      then:
+        - script.execute: defaults
+  - platform: template
+    id: all_off_button
+    name: "${all_off_name}"
+    on_press: 
+      then:
+        - script.execute: all_off
+
+script:
+  - id: defaults
+    mode: single
+    then:
+      - light.turn_on:
+          id: light_white
+          brightness: ${default_brightness}
+          color_temperature: ${default_color}
+          transition_length: 10s
+      - if:
+          condition:
+            lambda: return (${default_on});
+          then:
+            - light.turn_on:
+                id: light_white
+          else:
+            - light.turn_off:
+                id: light_white
+                transition_length: 0s
+      - light.turn_off: light_blue
+      - light.turn_off: light_green
+      - light.turn_off: builtin_mono
+      - light.turn_on:
+          id: builtin_rgb
+          brightness: ${default_rgb_brightness}
+          effect: random
+  - id: all_off
+    mode: single
+    then:
+      - light.turn_off: light_white
+      - light.turn_off: light_blue
+      - light.turn_off: light_green
+      - light.turn_off: builtin_rgb
+      - light.turn_off: builtin_mono
+
+  - id: timer
+    mode: restart
+    parameters:
+      minutes: int
+    then:
+      - if:
+          condition:
+            - light.is_on: light_white
+          then:
+            - light.turn_on: light_green
+            - delay: !lambda return (minutes * 60 * 1000);
+            - light.turn_off:
+                id: light_white
+                transition_length: ${timer_transition}
+            - light.turn_on:
+                id: light_green
+                effect: strobe
+            - delay: ${timer_transition}
+            - light.turn_on:
+                id: light_green
+                effect: none
+            - light.turn_off: light_green
+
+binary_sensor:
+  # Power, color, and timer buttons
+  - platform: esp32_touch
+    id: touch_timer
+    name: ${timer_name}
+    icon: ${timer_icon}
+    pin: GPIO01
+    threshold: ${touch_threshold}
+    disabled_by_default: True
+    on_press:
+      - if:
+          condition:
+            - script.is_running: timer
+          then:
+            - script.stop: timer
+            - light.turn_on:
+                id: light_green
+                effect: none
+            - light.turn_off: light_green
+            - light.turn_on: light_white
+          else:
+            - script.execute:
+                id: timer
+                minutes: ${timer_minutes}
+  - platform: esp32_touch
+    id: touch_color
+    name: ${color_name}
+    icon: ${color_icon}
+    pin: GPIO02
+    threshold: ${touch_threshold}
+    disabled_by_default: True
+    on_press:
+      then:
+        - if:
+            condition:
+              - light.is_on: light_white
+            then:
+              - lambda: |-
+                  int current = id(light_white).current_values.get_color_temperature_kelvin();
+                  int range = ${white_cool_temp} - ${white_warm_temp};
+                  int step = (
+                    ((float)(current - ${white_warm_temp}) / range) * ${white_color_steps}
+                  ) - 1;
+                  if (step < 0) {
+                    step = ${white_color_steps};
+                  }
+                  int next = (
+                    ((range / ${white_color_steps}) * step) + ${white_warm_temp}
+                  );
+                  ESP_LOGD("Temp", "C: %d\tS: %d\tN: %d", current, step, next);
+                  auto call = id(light_white).turn_on();
+                  // In mireds, I guess
+                  call.set_color_temperature(1000000.0f / next);
+                  call.perform();
+                  
+  - platform: esp32_touch
+    id: touch_power
+    name: ${power_name}
+    icon: ${power_icon}
+    pin: GPIO03
+    threshold: ${touch_threshold}
+    disabled_by_default: True
+    on_press:
+      then:
+        - light.toggle: light_white
+
+  # 5 brightness buttons
+  - platform: esp32_touch
+    id: touch_bright1
+    name: ${bright1_name}
+    icon: ${bright1_icon}
+    pin: GPIO05
+    threshold: ${touch_threshold}
+    disabled_by_default: True
+  - platform: esp32_touch
+    id: touch_bright2
+    name: ${bright2_name}
+    icon: ${bright2_icon}
+    pin: GPIO06
+    threshold: ${touch_threshold}
+    disabled_by_default: True
+  - platform: esp32_touch
+    id: touch_bright3
+    name: ${bright3_name}
+    icon: ${bright3_icon}
+    pin: GPIO07
+    threshold: ${touch_threshold}
+    disabled_by_default: True
+  - platform: esp32_touch
+    id: touch_bright4
+    name: ${bright4_name}
+    icon: ${bright4_icon}
+    pin: GPIO08
+    # It looks like this touch pad is busted
+    # It sometimes work with very high counts, but usually it gives nothing
+    threshold: ${touch_threshold_high}
+    disabled_by_default: True
+  - platform: esp32_touch
+    id: touch_bright5
+    name: ${bright5_name}
+    icon: ${bright5_icon}
+    pin: GPIO09
+    threshold: ${touch_threshold}
+    disabled_by_default: True
+
+
+# Touch hardware setup
+esp32_touch:
+  setup_mode: ${touch_debug}
+  measurement_duration: ${touch_measurement}
+  sleep_duration: ${touch_sleep}
+
+# Temporary patch for esp32_touch bootloop
+external_components:
+  - source: github://pr#16066
+    components: [esp32_touch]
+    refresh: 1h
+
+# JG9080D
+# Pin 1 - Touch bright 4
+# Pin 2 - Touch bright 5
+# Pin 3 - Touch timer
+# Pin 4 - Touch power
+# Pin 5 - Touch color
+# Pin 6 - Touch bright 1
+# Pin 7 - N/C?
+# Pin 8 - Ground
+# Pin 9 - Touch bright 3
+# Pin 10 - Touch bright 2
+# Pin 11 - Timer green (low)
+# Pin 12 - Timer blue (low)
+# Pin 13 - 3.3V
+# Pin 14 - N/C?
+# Pin 15 - 3k PWM
+# Pin 16 - 5k PWM
