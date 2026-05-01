@@ -67,6 +67,10 @@ substitutions:
   led_name: "LED"
   button_name: "Button"
   boot_name: "State at Boot"
+  lock_name: "Lock"
+  lock_icon: mdi:lock
+  unlock_name: "Unlock"
+  unlock_icon: mdi:lock-open
 
 packages:
   board: !include zi3-board-bk72xx.yaml
@@ -437,8 +441,8 @@ switch:
       - logger.log: "${boot_name} - ${relay2_name}: Off"
       - lambda: 'id(relay2_default) = false;'
 
-# Power cycle buttons, for single-action resets
 button:
+  # Power cycle buttons, for single-action resets
   - platform: template
     id: relay1_cycle
     name: ${relay1_cycle_name}
@@ -457,6 +461,35 @@ button:
         - switch.turn_off: relay2
         - delay: ${relay2_cycle_delay}
         - switch.turn_on: relay2
+
+  # Lock/unlock buttons, for single-action access control
+  - platform: template
+    id: lock
+    name: ${lock_name}
+    icon: ${lock_icon}
+    on_press:
+      - switch.turn_on: remote_control_switch
+      - switch.turn_off: relay1
+      - delay: 100ms
+      - switch.turn_off: relay2
+      - delay: 100ms
+      - switch.turn_off: relay1_boot
+      - switch.turn_off: relay2_boot
+      - switch.turn_off: local_control_switch
+      - switch.turn_off: remote_control_switch
+  - platform: template
+    id: unlock
+    name: ${unlock_name}
+    icon: ${unlock_icon}
+    on_press:
+      - switch.turn_on: local_control_switch
+      - switch.turn_on: remote_control_switch
+      - switch.turn_on: relay1_boot
+      - switch.turn_on: relay2_boot
+      - switch.turn_on: relay1
+      - delay: 100ms
+      - switch.turn_on: relay2
+      - delay: 100ms
 
 # Set relay states during boot
 esphome:

@@ -37,6 +37,10 @@ substitutions:
   relay1_cycle_icon: mdi:power-cycle
   remote_control_name: "Remote Control"
   remote_control_icon: mdi:toggle-switch
+  lock_name: "Lock"
+  lock_icon: mdi:lock
+  unlock_name: "Unlock"
+  unlock_icon: mdi:lock-open
   
   # Config names and icons
   boot_name: "State at Boot"
@@ -163,8 +167,8 @@ switch:
       - logger.log: "${remote_control_name}: Disabled"
       - lambda: 'id(remote_control) = false;'
 
-# Power cycle button, for single-action resets
 button:
+  # Power cycle button, for single-action resets
   - platform: template
     id: relay1_cycle
     name: ${relay1_cycle_name}
@@ -174,6 +178,27 @@ button:
         - switch.turn_off: relay1
         - delay: ${relay1_cycle_delay}
         - switch.turn_on: relay1
+
+  # Lock/unlock buttons, for single-action access control
+  - platform: template
+    id: lock
+    name: ${lock_name}
+    icon: ${lock_icon}
+    on_press:
+      - switch.turn_on: remote_control_switch
+      - switch.turn_off: relay1
+      - delay: 100ms
+      - switch.turn_off: relay1_boot
+      - switch.turn_off: remote_control_switch
+  - platform: template
+    id: unlock
+    name: ${unlock_name}
+    icon: ${unlock_icon}
+    on_press:
+      - switch.turn_on: remote_control_switch
+      - switch.turn_on: relay1_boot
+      - switch.turn_on: relay1
+      - delay: 100ms
 
 # Set relay states during boot
 esphome:
