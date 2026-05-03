@@ -111,28 +111,7 @@ Example: `light-guest-rgb.yaml`
 
 ## Vornado Transom Fan
 
-The [Vornado Transom](https://vornado.com/products/transom-parent) fan is a blower fan designed to mount across the bottom 
-of a hung window. I like the fan hardware. It includes an IR remote, runs at 4 discrete speeds, can be reversed 
-electronically, closes when off, and includes a thermostatic function. I do not like the UI. It spends several seconds doing 
-a light show every time you turn it on &mdash; which you have to wait for before you can change any settings &mdash; and it 
-requires multiple state-dependent button pushes on both the remote and local interfaces. It's very difficult to use reliably 
-if you cannot see the display panel when changing settings
-
-Luckily it's possible to read and set most of the device state without any significant modification. There are separate 
-motor control and UI boards and the connection between them uses a UART link. The IR receiver is easily accessible from the 
-back of the UI board. With those two connections it's possible to simulate IR input (and/or read IR ambient signals 
-from the sensor) and to determine the fan state, which allows for closed-loop automation
-
-The device includes a thermostatic mode. That mode can be detected from the UART data when armed but not when triggered, nor 
-can the setpoint or current or temperature be determined. The thermocouple is connected with long wire and would be simple 
-to move to a smarter controller if you wanted to use the fan's existing sensor for a custom thermostatic control
-
-The fan provides 5V power from the motor control board to the UI board, but there's less than 100 mA avaiable and it needs 
-to drive the whole UI board in addition to any load you add. The 100 mA limit comes from the MX2003, a slightly unusual chip 
-that combines an array of darlington transistors (for driving the fan's baffle motor) with a tiny 5V power supply driven 
-from the higher voltage on the motor side of that array. The motor control board generates a higher current 12V supply for 
-the baffle motor and I found plenty for room to stick in my own buck converter to provide more 5V current for the ESP32. 
-There's a big 47 Ω resistor next to the MX2003 that you can tap for access to the 12V rail
+[Vornado Transom Fan](https://zi3.dev/vornado-transom-fan/)
 
 Example: `fan-office.yaml` \
 Library: `zi3-fan-transom.yaml`
