@@ -16,6 +16,11 @@ esp32:
   board: ${zero_board}
   flash_size: ${zero_flash_size}
 
+psram:
+  mode: octal
+  speed: 80MHz
+  ignore_not_found: false
+
 light:
   - platform: esp32_rmt_led_strip
     id: builtin_rgb

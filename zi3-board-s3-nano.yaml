@@ -22,6 +22,11 @@ esp32:
   board: ${nano_board}
   flash_size: ${nano_flash_size}
 
+psram:
+  mode: octal
+  speed: 80MHz
+  ignore_not_found: false
+
 light:
   - platform: rgb
     id: builtin_rgb
@@ -102,3 +107,30 @@ output:
             level: !lambda |-
               float k = (1.0f - ${builtin_green_min}f) / 0.99f;
               return (state > 0.0f) ? (k * state) + ${builtin_green_min} : 0.0f;
+
+
+# Pin map
+# D13: GPIO48 (SCK)
+# B0: GPIO46
+# A0: GPIO01
+# A1: GPIO02
+# A2: GPIO03
+# A3: GPIO04
+# A4: GPIO11 (SDA)
+# A5: GPIO12 (SCL)
+# A6: GPIO13
+# A7: GPIO14
+# B1: GPIO00
+# D12: GPIO47 (MISO)
+# D11: GPIO38 (MOSI)
+# D10: GPIO21
+# D9: GPIO18
+# D8: GPIO17
+# D7: GPIO10
+# D6: GPIO09
+# D5: GPIO08
+# D4: GPIO07
+# D3: GPIO06
+# D2: GPIO05
+# RX0: GPIO44
+# TX1: GPIO43

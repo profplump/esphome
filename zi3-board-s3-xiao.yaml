@@ -14,6 +14,11 @@ esp32:
   board: ${xiao_board}
   flash_size: ${xiao_flash_size}
 
+psram:
+  mode: octal
+  speed: 80MHz
+  ignore_not_found: false
+
 esphome:
   platformio_options:
     build_flags: -DBOARD_HAS_PSRAM
@@ -34,3 +39,15 @@ light:
     name: ${builtin_mono_name}
     icon: ${builtin_mono_icon}
     output: user_led
+
+# Pin map
+# D1: GPIO01
+# D2: GPIO02
+# D3: GPIO03
+# D4: GPIO04
+# D5: GPIO05
+# D6: GPIO43
+# D7: GPIO44
+# D8: GPIO07
+# D9: GPIO08
+# D10: GPIO09

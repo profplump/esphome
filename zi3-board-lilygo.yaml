@@ -29,8 +29,9 @@ esp32:
   flash_size: 16MB
 
 psram:
-  speed: 80MHz
   mode: octal
+  speed: 80MHz
+  ignore_not_found: false
 
 #i2c:
 #  sda: GPIO17
