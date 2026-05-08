@@ -1,4 +1,4 @@
-# Pinout source: https://www.waveshare.com/wiki/ESP32-S3-Zero
+# Datasheet: https://www.waveshare.com/wiki/ESP32-S3-Zero
 
 substitutions:
   zero_board: esp32-s3-devkitc-1
@@ -17,7 +17,8 @@ esp32:
   flash_size: ${zero_flash_size}
 
 psram:
-  mode: octal
+  # quad not octal, despite the website text
+  mode: quad
   speed: 80MHz
   ignore_not_found: false
 
