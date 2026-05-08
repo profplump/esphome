@@ -4,7 +4,6 @@ substitutions:
   api_key: !secret api-av-hdmi-switch
   ota_key: !secret ota-av-hdmi-switch
   ap_key: !secret ap-av-hdmi-switch
-  c3_board: seeed_xiao_esp32c3
 
   # Save the at-boot config, default to OFF if config lost
   autoswitch_boot_restore: RESTORE_DEFAULT_OFF
@@ -31,20 +30,21 @@ packages:
   ap: !include zi3-ap.yaml
   nvm: !include zi3-nvm.yaml
   base: !include zi3-base.yaml
-  board: !include zi3-board-c3.yaml
+  board: !include zi3-board-s3-xiao.yaml
 
 esphome:
   on_boot:
   # Sync hardware to the input & autoswitch defaults @ late boot
   - priority: 100
     then:
+      - script.execute:
+          id: auto_enable
+          enable: False
       - if:
           condition:
             - switch.is_on: autoswitch_boot
           then:
             - switch.turn_on: autoswitch
-          else:
-            - switch.turn_off: autoswitch
       - select.set:
           id: hdmi_input
           option: !lambda return esphome::to_string(id(input_default));
@@ -61,9 +61,9 @@ uart:
   id: uart_hdmi
   baud_rate: 19200
   rx_pin: 
-    number: GPIO10
+    number: GPIO44
   tx_pin:
-    number: GPIO09
+    number: GPIO43
     #ignore_strapping_warning: True
   debug:
     direction: BOTH
@@ -139,7 +139,7 @@ select:
       then:
         - lambda: id(input_default) = std::atoi(x.c_str());
 
-# Combine all the active sensors into a single value
+# Combine all the active_X sensors into a single value
 sensor:
   - platform: binary_sensor_map
     id: active_input
@@ -158,56 +158,78 @@ sensor:
         value: 3
       - binary_sensor: active_4
         value: 4
+    on_value: 
+      then:
+        - lambda: |-
+            int port = int(x);
+            if (port >= 1 && port <= 4) {
+              id(hdmi_input).publish_state(esphome::to_string(port));
+            }
 
 # Read the individual ready and active lights from each input channel
 # Active sensors are internal-only; we publish the binary sensor map instead
+# The active voltage is a little low (~2V); debounce to avoid flapping
 binary_sensor:
   - platform: gpio
     id: active_1
     internal: True
     pin:
       number: GPIO01
+    filters:
+      - delayed_on_off: 10ms
   - platform: gpio
     id: active_2
     internal: True
     pin:
-      number: GPIO02
-      #ignore_strapping_warning: True
+      number: GPIO07
+    filters:
+      - delayed_on_off: 10ms
   - platform: gpio
     id: active_3
     internal: True
     pin:
-      number: GPIO03
+      number: GPIO04
+    filters:
+      - delayed_on_off: 10ms
   - platform: gpio
     id: active_4
     internal: True
     pin:
-      number: GPIO04
+      number: GPIO06
+    filters:
+      - delayed_on_off: 10ms
   - platform: gpio
     id: ready_1
     name: "${input_name} 1 ${ready_name}"
     icon: ${ready_icon}
     pin:
-      number: GPIO05
+      number: GPIO03
+    filters:
+      - delayed_on_off: 10ms
   - platform: gpio
     id: ready_2
     name: "${input_name} 2 ${ready_name}"
     icon: ${ready_icon}
     pin:
-      number: GPIO06
+      number: GPIO09
+    filters:
+      - delayed_on_off: 10ms
   - platform: gpio
     id: ready_3
     name: "${input_name} 3 ${ready_name}"
     icon: ${ready_icon}
     pin:
-      number: GPIO07
+      number: GPIO02
+    filters:
+      - delayed_on_off: 10ms
   - platform: gpio
     id: ready_4
     name: "${input_name} 4 ${ready_name}"
     icon: ${ready_icon}
     pin:
-      number: GPIO08
-      #ignore_strapping_warning: True
+      number: GPIO05
+    filters:
+      - delayed_on_off: 10ms
 
 script:
   # Select the HDMI input by index
@@ -216,8 +238,7 @@ script:
     parameters:
       opt_value: string
     then:
-      - uart.write: "\r\n"
-      - uart.write: "sw i0"
+      - uart.write: "swi0"
       - uart.write: !lambda return { opt_value.data()[0] };
       - uart.write: "\r\n"
       - lambda: id(hdmi_input).publish_state(opt_value);
@@ -227,7 +248,6 @@ script:
     parameters:
       enable: bool
     then:
-      - uart.write: "\r\n"
       - uart.write: "pod "
       - if:
           condition:
