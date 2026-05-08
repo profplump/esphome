@@ -1,0 +1,123 @@
+# ePaper: https://wiki.seeedstudio.com/epaper_ee04/
+# S3Plus: https://wiki.seeedstudio.com/xiao_esp32s3_getting_started/
+
+substitutions:
+  s3plus_board: esp32-s3-devkitc-1
+  s3plus_flash_size: 16MB
+
+  # Default to arduino until esp-idf has s3plus support
+  #esp32_framework_type: arduino
+
+  # Lamp constants
+  builtin_mono_min: 0.01
+
+  # Names and icons for HA
+  builtin_mono_name: "Builtin Mono"
+  builtin_mono_icon: mdi:head-lightbulb-outline
+  battery_name: "Battery Voltage"
+  battery_icon: mdi:battery-medium
+  button_name: "Button"
+  button_1_name: "${button_name} 1"
+  button_1_icon: mdi:button-pointer
+  button_2_name: "${button_name} 2"
+  button_2_icon: ${button_1_icon}
+  button_3_name: "${button_name} 3"
+  button_3_icon: ${button_1_icon}
+
+packages:
+  esp32: !include zi3-board-esp32.yaml
+  wifi: !include zi3-wifi.yaml
+
+esp32:
+  board: ${s3plus_board}
+  flash_size: ${s3plus_flash_size}
+
+psram:
+  mode: octal
+  speed: 80MHz
+  ignore_not_found: false
+
+spi:
+  clk_pin: GPIO07
+  mosi_pin: GPIO09
+
+light:
+  - platform: monochromatic
+    id: builtin_mono
+    name: ${builtin_mono_name}
+    icon: ${builtin_mono_icon}
+    output: builtin_mono_lamp
+
+output:
+  # Builtin mono LED and scalar
+  - platform: ledc
+    id: builtin_mono_led
+    pin:
+      number: GPIO21
+      inverted: True
+  - platform: template
+    type: float
+    id: builtin_mono_lamp
+    write_action:
+      then:
+        - output.set_level:
+            id: builtin_mono_led
+            level: !lambda |-
+              float k = (1.0f - ${builtin_mono_min}f) / 0.99f;
+              return (state > 0.0f) ? (k * state) + ${builtin_mono_min} : 0.0f;
+
+  # Power control for the battery ADC
+  - platform: gpio
+    id: adc_enable
+    pin: GPIO6
+
+binary_sensor:
+  - platform: gpio
+    id: button_1
+    name: ${button_1_name}
+    icon: ${button_1_icon}
+    pin: GPIO2
+  - platform: gpio
+    id: button_2
+    name: ${button_2_name}
+    icon: ${button_2_icon}
+    pin:
+      number: GPIO3
+      ignore_strapping_warning: True
+  - platform: gpio
+    id: button_3
+    name: ${button_3_name}
+    icon: ${button_3_icon}
+    pin: GPIO5
+
+sensor:
+  - platform: adc
+    id: battery_adc
+    name: ${battery_name}
+    icon: ${battery_icon}
+    pin: GPIO01
+    state_class: measurement
+    device_class: voltage
+    unit_of_measurement: "V"
+    accuracy_decimals: 2
+
+# GPIO pinout
+# 01: Battery ADC
+# 02: Button 1
+# 03: Button 2
+# 04: EDP Busy
+# 05: Button 3
+# 06: ADC Enable
+# 07: EDP Clock (SPI0_CLK)
+# 09: EDP Data In (SPI0_MOSI)
+# 10: EDP Data/Command
+# 11: SPI1_CLK
+# 12: SPI1_MISO
+# 13: SPI1_MOSI
+# 38: EDP Reset
+# 39: SPI1_CS0
+# 40: SPI1_CS1
+# 41: NFC1
+# 42: NFC2
+# 43: Power Enable
+# 44: EDP Chip Select (SPI0_CS)

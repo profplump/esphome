@@ -1,0 +1,28 @@
+substitutions:
+  name: esp32-seeed-epaper
+  friendly_name: "Seeed ePaper"
+  api_key: !secret api-seeed-epaper
+  ota_key: !secret ota-seeed-epaper
+
+packages:
+  ap: !include zi3-ap.yaml
+  base: !include zi3-base.yaml
+  board: !include zi3-board-epaper.yaml
+
+font:
+  - file: "Roboto-Regular.ttf"
+    id: roboto_60
+    size: 60
+
+display:
+  - platform: waveshare_epaper
+    model: 7.50inv2
+    cs_pin: GPIO44
+    dc_pin: GPIO10
+    reset_pin: GPIO38
+    busy_pin: 
+      number: GPIO4
+      inverted: true
+    update_interval: 30s
+    lambda: |-
+      it.print(0, 0, id(roboto_60), "Hello World!");
