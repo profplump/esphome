@@ -1,0 +1,79 @@
+substitutions:
+  name: esp32-bt-zwave
+  friendly_name: BT - ZWave
+  api_key: !secret api-bt-zwave
+  ota_key: !secret ota-bt-zwave
+  zwave_vid: 0x303A
+  zwave_pid: 0x4001
+
+packages:
+  base: !include zi3-base.yaml
+  board: !include zi3-board-eth.yaml
+
+mdns:
+  services:
+    - service: "_zwave"
+      protocol: "_tcp"
+      port: 6053
+      txt:
+        protocol: "esphome"
+
+logger:
+  # ZWave uses USB so log to UART0
+  hardware_uart: UART0
+
+usb_host:
+  devices:
+    - id: usb_zwave
+      vid: ${zwave_vid}
+      pid: ${zwave_pid}
+
+usb_uart:
+  - type: CDC_ACM
+    vid: ${zwave_vid}
+    pid: ${zwave_pid}
+    channels:
+      - id: uch_1
+        baud_rate: 115200
+        buffer_size: 1024
+
+zwave_proxy:
+  id: zw_proxy
+
+bluetooth_proxy:
+  id: bt_proxy
+
+esp32_ble_tracker:
+  id: ble_tracker
+
+switch:
+  - platform: template
+    id: bluetooth_enabled_switch
+    name: "Bluetooth Proxy"
+    entity_category: config
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    # BT stack must be initialized before we can call enable/disable actions
+    setup_priority: 275.0
+    turn_on_action:
+      - ble.enable:
+    turn_off_action:
+      - ble.disable:
+
+select:
+  - platform: template
+    name: "Bluetooth Scanner Mode"
+    id: scanner_mode
+    options:
+      - "Passive"
+      - "Active"
+    lambda: |-
+      if (id(ble_tracker).get_scan_active()) {
+        return {"Active"};
+      } else {
+        return {"Passive"};
+      }
+    set_action:
+      - lambda: |-
+          id(bt_proxy).bluetooth_scanner_set_mode(x == "Active");
+      - component.update: scanner_mode
