@@ -8,7 +8,7 @@ substitutions:
 packages:
   ap: !include zi3-ap.yaml
   base: !include zi3-base.yaml
-  board: !include zi3-board-c3.yaml
+  board: !include zi3-board-c3-xiao.yaml
 
 esphome:
   on_boot:

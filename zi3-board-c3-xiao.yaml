@@ -1,0 +1,20 @@
+# Pinout source: https://wiki.seeedstudio.com/XIAO_ESP32C3_Getting_Started/
+
+substitutions:
+  c3_board: seeed_xiao_esp32c3
+
+packages:
+  c3: !include zi3-board-c3.yaml
+
+# Pin map
+# D0: GPIO02 (ADC1)
+# D1: GPIO03 (ADC1)
+# D2: GPIO04 (ADC1)
+# D3: GPIO05 (ADC2 - Not available w/WiFi)
+# D4: GPIO06 (SDA)
+# D5: GPIO07 (SCL)
+# D6: GPIO21 (TX)
+# D7: GPIO20 (RX)
+# D8: GPIO08 (SCK)
+# D9: GPIO09 (MISO)
+# D10: GPIO10 (MOSI)
