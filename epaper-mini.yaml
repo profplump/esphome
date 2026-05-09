@@ -1,0 +1,97 @@
+substitutions:
+  name: esp32-epaper-mini
+  friendly_name: "ePaper - Mini"
+  api_key: !secret api-epaper-mini
+  ota_key: !secret ota-epaper-mini
+  ap_key: !secret ap-epaper-mini
+
+  font_size: 60
+
+packages:
+  ap: !include zi3-ap.yaml
+  base: !include zi3-base.yaml
+  board: !include zi3-board-s3-xiao.yaml
+
+api:
+  on_client_connected:
+    - delay: 250ms
+    - component.update: mini_display
+
+button:
+  - platform: template
+    id: force_update
+    name: "Force Update"
+    on_press: 
+      then:
+        component.update: mini_display
+
+spi:
+  clk_pin: GPIO07
+  mosi_pin: GPIO09
+
+font:
+  - file: "Roboto-Regular.ttf"
+    id: roboto
+    size: ${font_size}
+
+# Data from HA
+text_sensor:
+  - platform: homeassistant
+    entity_id: weather.forecast_home
+    id: ha_weather
+  - platform: homeassistant
+    entity_id: weather.forecast_home
+    id: ha_temp_unit
+    attribute: "temperature_unit"
+  - platform: homeassistant
+    entity_id: weather.forecast_home
+    id: ha_pressure_unit
+    attribute: "pressure_unit"
+  - platform: homeassistant
+    entity_id: weather.forecast_home
+    id: ha_wind_unit
+    attribute: "wind_speed_unit"
+sensor:
+  - platform: homeassistant
+    entity_id: weather.forecast_home
+    id: ha_temp
+    attribute: "temperature"
+  - platform: homeassistant
+    entity_id: weather.forecast_home
+    id: ha_pressure
+    attribute: "pressure"
+  - platform: homeassistant
+    entity_id: weather.forecast_home
+    id: ha_wind
+    attribute: "wind_speed"
+  - platform: homeassistant
+    entity_id: weather.forecast_home
+    id: ha_wind_dir
+    attribute: "wind_bearing"
+  - platform: homeassistant
+    entity_id: weather.forecast_home
+    id: ha_humidity
+    attribute: "humidity"
+  - platform: homeassistant
+    entity_id: weather.forecast_home
+    id: ha_cloud
+    attribute: "cloud_coverage"
+
+display:
+  - platform: epaper_spi
+    id: mini_display
+    # 250x122 WRK (Normal Busy)
+    model: waveshare-2.13in-v3
+    rotation: 90
+    cs_pin: GPIO02
+    dc_pin: GPIO04
+    reset_pin: GPIO01
+    busy_pin:
+      number: GPIO06
+    update_interval: never
+    lambda: |-
+      it.printf(0, 0*${font_size}, id(roboto), "Temperature: %d %s", int(id(ha_temp).state), id(ha_temp_unit).state.c_str());
+      it.printf(0, 1*${font_size}, id(roboto), "Cloud: %d%% %s", int(id(ha_cloud).state), id(ha_weather).state.c_str());
+      //it.printf(0, 2*${font_size}, id(roboto), "Humidity: %.1f%%", id(ha_humidity).state);
+      //it.printf(0, 3*${font_size}, id(roboto), "Wind: %.1f %s @ %d°", id(ha_wind).state, id(ha_wind_unit).state.c_str(), int(id(ha_wind_dir).state));
+      //it.printf(0, 4*${font_size}, id(roboto), "Pressure: %.1f %s", id(ha_pressure).state, id(ha_pressure_unit).state.c_str());
