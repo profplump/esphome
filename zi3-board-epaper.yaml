@@ -76,19 +76,24 @@ binary_sensor:
     id: button_1
     name: ${button_1_name}
     icon: ${button_1_icon}
-    pin: GPIO2
+    pin:
+      number: GPIO2
+      inverted: True
   - platform: gpio
     id: button_2
     name: ${button_2_name}
     icon: ${button_2_icon}
     pin:
       number: GPIO3
+      inverted: True
       ignore_strapping_warning: True
   - platform: gpio
     id: button_3
     name: ${button_3_name}
     icon: ${button_3_icon}
-    pin: GPIO5
+    pin:
+      number: GPIO5
+      inverted: True
 
 sensor:
   - platform: adc

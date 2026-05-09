@@ -3,26 +3,96 @@ substitutions:
   friendly_name: "Seeed ePaper"
   api_key: !secret api-seeed-epaper
   ota_key: !secret ota-seeed-epaper
+  ap_key: !secret ap-seeed-epaper
+  font_size: 60
 
 packages:
   ap: !include zi3-ap.yaml
   base: !include zi3-base.yaml
   board: !include zi3-board-epaper.yaml
 
+api:
+  on_client_connected:
+    - delay: 250ms
+    - component.update: big_display
+
+binary_sensor:
+  - id: !extend button_1
+    on_press:
+      then:
+        - component.update: big_display
+
+button:
+  - platform: template
+    id: screen_update
+    name: "Force Update"
+    on_press: 
+      then:
+        - component.update: big_display
+
 font:
   - file: "Roboto-Regular.ttf"
-    id: roboto_60
-    size: 60
+    id: roboto
+    size: ${font_size}
+
+# Data from HA
+text_sensor:
+  - platform: homeassistant
+    entity_id: weather.forecast_home
+    id: ha_weather
+  - platform: homeassistant
+    entity_id: weather.forecast_home
+    id: ha_temp_unit
+    attribute: "temperature_unit"
+  - platform: homeassistant
+    entity_id: weather.forecast_home
+    id: ha_pressure_unit
+    attribute: "pressure_unit"
+  - platform: homeassistant
+    entity_id: weather.forecast_home
+    id: ha_wind_unit
+    attribute: "wind_speed_unit"
+sensor:
+  - platform: homeassistant
+    entity_id: weather.forecast_home
+    id: ha_temp
+    attribute: "temperature"
+  - platform: homeassistant
+    entity_id: weather.forecast_home
+    id: ha_pressure
+    attribute: "pressure"
+  - platform: homeassistant
+    entity_id: weather.forecast_home
+    id: ha_wind
+    attribute: "wind_speed"
+  - platform: homeassistant
+    entity_id: weather.forecast_home
+    id: ha_wind_dir
+    attribute: "wind_bearing"
+  - platform: homeassistant
+    entity_id: weather.forecast_home
+    id: ha_humidity
+    attribute: "humidity"
+  - platform: homeassistant
+    entity_id: weather.forecast_home
+    id: ha_cloud
+    attribute: "cloud_coverage"
 
 display:
   - platform: waveshare_epaper
-    model: 7.50inv2
+    id: big_display
+    # 640x480 B/W (Inverted Busy)
+    model: 5.83inv2
     cs_pin: GPIO44
     dc_pin: GPIO10
     reset_pin: GPIO38
-    busy_pin: 
+    busy_pin:
       number: GPIO4
-      inverted: true
-    update_interval: 30s
+      inverted: True
+    update_interval: never
     lambda: |-
-      it.print(0, 0, id(roboto_60), "Hello World!");
+      it.printf(0, 0*60, id(roboto), "Temperature: %d %s", int(id(ha_temp).state), id(ha_temp_unit).state.c_str());
+      it.printf(0, 1*60, id(roboto), "Cloud: %d%% %s", int(id(ha_cloud).state), id(ha_weather).state.c_str());
+      it.printf(0, 2*60, id(roboto), "Humidity: %.1f%%", id(ha_humidity).state);
+      it.printf(0, 3*60, id(roboto), "Wind: %.1f %s @ %d°", id(ha_wind).state, id(ha_wind_unit).state.c_str(), int(id(ha_wind_dir).state));
+      it.printf(0, 4*60, id(roboto), "Pressure: %.1f %s", id(ha_pressure).state, id(ha_pressure_unit).state.c_str());
