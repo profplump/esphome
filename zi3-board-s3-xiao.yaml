@@ -41,11 +41,12 @@ light:
     output: user_led
 
 # Pin map
-# D1: GPIO01
-# D2: GPIO02
-# D3: GPIO03
-# D4: GPIO04
-# D5: GPIO05
+# D0: GPIO01
+# D1: GPIO02
+# D2: GPIO03
+# D3: GPIO04
+# D4: GPIO05
+# D5: GPIO06
 # D6: GPIO43
 # D7: GPIO44
 # D8: GPIO07
