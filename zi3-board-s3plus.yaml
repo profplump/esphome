@@ -1,0 +1,31 @@
+# Pinout source: https://wiki.seeedstudio.com/xiao_esp32s3_getting_started/
+# This board matches the s3-xiao except for bigger flash and more exposed pins
+
+substitutions:
+  xiao_flash_size: 16MB
+
+packages:
+  esp32: !include zi3-board-s3-xiao.yaml
+
+# Pin map
+# D0: GPIO01
+# D1: GPIO02
+# D2: GPIO03
+# D3: GPIO04
+# D4: GPIO05
+# D5: GPIO06
+# D6: GPIO43
+# D7: GPIO44
+# D8: GPIO07
+# D9: GPIO08
+# D10: GPIO09
+# D11: GPIO38
+# D12: GPIO39
+# D13: GPIO40
+# D14: GPIO41
+# D15: GPIO42
+# D16: GPIO10 (Battery ADC)
+# D17: GPIO13
+# D18: GPIO12
+# D19: GPIO11
+# LED: GPIO21

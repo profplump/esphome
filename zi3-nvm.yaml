@@ -18,7 +18,6 @@ button:
     name: ${system_sync_name}
     icon: ${sytsem_sync_icon}
     entity_category: config
-    disabled_by_default: True
     on_press:
       - logger.log: ${system_sync_name}
       - lambda: |-

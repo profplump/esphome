@@ -2,11 +2,17 @@
 
 substitutions:
   zero_board: esp32-s3-devkitc-1
-  zero_flash_size: 4MB
   builtin_rgb_name: "Builtin RGB"
   builtin_rgb_icon: mdi:head-lightbulb-outline
   builtin_rgb_rmt: 48
   builtin_rgb_disabled: False
+
+  # Older revisions have quad-4MB PSRAM
+  zero_flash_size: 4MB
+  zero_flash_width: quad
+  # Revisions with N8R8 stickers have octal-8MB PSRAM
+  #zero_flash_size: 8MB
+  #zero_flash_width: octal
 
 packages:
   esp32: !include zi3-board-esp32.yaml
@@ -18,7 +24,7 @@ esp32:
 
 psram:
   # quad not octal, despite the website text
-  mode: quad
+  mode: ${zero_flash_width}
   speed: 80MHz
   ignore_not_found: false
 
