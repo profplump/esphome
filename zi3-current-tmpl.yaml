@@ -3,15 +3,15 @@
     condition:
         - lambda: |-
             if (
-              (!id(current_overload))              && // current_overload not set
-              (id(current_limit) > ${current_min}) && // current_limit is valid
-              (x > id(current_limit))                 // This reading exceeds current_limit
+              (!id(current_overload))                    && // current_overload not set
+              (id(current_limit).state > ${current_min}) && // current_limit is valid
+              (x > id(current_limit).state)                 // This reading exceeds current_limit
             ) {
               // Accumulate overload samples
               id(current_overload_count)++;
               ESP_LOGD("${current_overload_name}",
                 "Sample (%d/${current_limit_samples}): %.2fA load / %.2fA limit",
-                id(current_overload_count), x, id(current_limit));
+                id(current_overload_count), x, id(current_limit).state);
             } else {
               // Reset the count on any non-overload sample
               id(current_overload_count) = 0;
@@ -24,5 +24,5 @@
           id(current_overload_sensor).publish_state(id(current_overload));
       - logger.log:
           format: "${current_overload_name}: %.2fA load / %.2fA limit"
-          args: [ 'x', 'id(current_limit)' ]
+          args: [ 'x', 'id(current_limit).state' ]
       - script.execute: overload_script

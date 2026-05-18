@@ -29,7 +29,7 @@ substitutions:
   smt_update: False
 
   # Init dimmer to OFF, 1s transitions, 6s updates
-  dimmer_restore: ALWAYS_OFF
+  dimmer_restore: RESTORE_DEFAULT_OFF
   dimmer_transition: 1s
   dimmer_interval: 1s
   dimmer_interval_filter: 6

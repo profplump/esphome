@@ -32,10 +32,6 @@ globals:
   - id: temp_overload
     type: bool
     initial_value: "false"
-  - id: temp_limit
-    type: float
-    initial_value: ${temp_limit_default}
-    restore_value: True
 
 binary_sensor:
   - platform: template
@@ -80,8 +76,8 @@ sensor:
             condition:
                 - lambda: |-
                     return (
-                      (!id(temp_overload)) && // temp_overload not set
-                      (x > id(temp_limit))    // This reading exceeds temp_limit
+                      (!id(temp_overload))    && // temp_overload not set
+                      (x > id(temp_limit).state) // This reading exceeds temp_limit
                     );
             then:
               - lambda: |-
@@ -89,7 +85,7 @@ sensor:
                   id(temp_overload_sensor).publish_state(id(temp_overload));
               - logger.log:
                   format: "${temp_overload_name}: %.1f°C reading / %.1f°C limit"
-                  args: [ 'x', 'id(temp_limit)' ]
+                  args: [ 'x', 'id(temp_limit).state' ]
               - script.execute: overload_script
 
   # Expose our numeric constants to the API
@@ -142,24 +138,18 @@ text_sensor:
 number:
   # API temp limit
   - platform: template
-    id: temp_limit_input
+    id: temp_limit
     name: ${temp_limit_name}
     icon: ${temp_limit_icon}
-    lambda: 'return id(temp_limit);'
+    disabled_by_default: True
+    optimistic: True
+    restore_value: True
+    initial_value: ${temp_limit_default}
     entity_category: config
     unit_of_measurement: "°C"
-    disabled_by_default: True
     min_value: ${temp_min}
     max_value: ${temp_max}
     step: ${temp_step}
-    set_action:
-      then:
-        - lambda: |-
-            id(temp_limit) = x;
-            id(temp_limit_input).publish_state(id(temp_limit));
-        - logger.log:
-            format: "${temp_limit_name}: %.2f"
-            args: [ 'id(temp_limit)' ]
 
 # API reset from overload
 button:
@@ -174,7 +164,7 @@ button:
             - lambda: |-
                 return (
                   (std::isnan(id(temperature).state))      || // Temperature is not valid
-                  (id(temperature).state <= id(temp_limit))   // Temperature does not exceed temp_limit
+                  (id(temperature).state <= id(temp_limit).state)   // Temperature does not exceed temp_limit
                 );
           then:
             - if:
@@ -188,4 +178,4 @@ button:
           else:
             - logger.log:
                 format: "${temp_overload_name}: Reset failed. Temperature: %.1f°C reading / %.1f°C limit"
-                args: [ 'id(temperature).state', 'id(temp_limit)' ]
+                args: [ 'id(temperature).state', 'id(temp_limit).state' ]
