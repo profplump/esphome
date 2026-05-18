@@ -6,7 +6,6 @@ substitutions:
   ap_key: !secret ap-rf-sonoff
 
 packages:
-  ap: !include zi3-ap.yaml
   base: !include zi3-base.yaml
   board: !include zi3-board-esp8285.yaml
   rf_doors: !include zi3-rf-door-sensor.yaml

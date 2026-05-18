@@ -78,6 +78,12 @@ packages:
   bl0942: !include zi3-bl0942.yaml
   current: !include zi3-current.yaml
 
+# Drop any AP/captive_portal config that got included
+# The AP usually makes this platform crash for some reason
+wifi:
+  ap: !remove
+captive_portal: !remove
+
 globals:
   - id: led_relay_status
     type: bool

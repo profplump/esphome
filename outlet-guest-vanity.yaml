@@ -15,7 +15,5 @@ substitutions:
   local_restore: RESTORE_DEFAULT_OFF
 
 packages:
-  # AP usually fails on this board, but maybe future versions will work
-  #ap: !include zi3-ap.yaml
   base: !include zi3-base.yaml
   outlet: !include zi3-outlet-elegrp.yaml

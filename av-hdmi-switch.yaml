@@ -27,7 +27,6 @@ substitutions:
   boot_icon: mdi:toggle-switch
 
 packages:
-  ap: !include zi3-ap.yaml
   nvm: !include zi3-nvm.yaml
   base: !include zi3-base.yaml
   board: !include zi3-board-s3-xiao.yaml

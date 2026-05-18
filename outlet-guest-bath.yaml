@@ -19,6 +19,5 @@ substitutions:
   relay1_icon: mdi:power-socket-us
 
 packages:
-  ap: !include zi3-ap.yaml
   base: !include zi3-base.yaml
   shelly: !include zi3-switch-shelly.yaml

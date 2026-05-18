@@ -11,6 +11,5 @@ substitutions:
   #wifi_ssid: "no_such_network"
 
 packages:
-  ap: !include zi3-ap.yaml
   base: !include zi3-base.yaml
   outlet: !include zi3-outlet-elegrp.yaml

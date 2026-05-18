@@ -80,7 +80,6 @@ substitutions:
   all_off_icon: mdi:toggle-switch-off
 
 packages:
-  ap: !include zi3-ap.yaml
   base: !include zi3-base.yaml
   board: !include zi3-board-s3-nano.yaml
 
@@ -261,7 +260,7 @@ sensor:
                   brightness: !lambda return ((float)x / 100.0f);
 
   # Wireless charging LED
-  # This requires an ADC channel because it floats as high as 0.8V when off
+  # This requires an ADC channel because it floats near 1V when off
   # - platform: adc
   #   id: charge_led
   #   name: ${charge_name}

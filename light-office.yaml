@@ -17,6 +17,5 @@ substitutions:
   dimmer_icon: mdi:globe-light-outline
 
 packages:
-  ap: !include zi3-ap.yaml
   base: !include zi3-base.yaml
   shelly: !include zi3-dimmer-shelly.yaml

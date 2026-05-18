@@ -6,6 +6,5 @@ substitutions:
   ap_key: !secret ap-fan-bath
 
 packages:
-  ap: !include zi3-ap.yaml
   base: !include zi3-base.yaml
   fan: !include zi3-fan-transom.yaml

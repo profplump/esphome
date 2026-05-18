@@ -8,7 +8,6 @@ substitutions:
   builtin_rgb_icon: mdi:lightbulb-night
 
 packages:
-  ap: !include zi3-ap.yaml
   base: !include zi3-base.yaml
   board: !include zi3-board-s3-zero.yaml
 
