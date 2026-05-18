@@ -5,6 +5,10 @@ substitutions:
   ota_key: !secret ota-fan-guest
   ap_key: !secret ap-fan-guest
 
+  # N8R8 model
+  zero_flash_size: 8MB
+  zero_flash_width: octal
+
 packages:
   base: !include zi3-base.yaml
   fan: !include zi3-fan-transom.yaml
