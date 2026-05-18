@@ -4,77 +4,7 @@ substitutions:
   api_key: !secret api-bt-proxy-front
   ota_key: !secret ota-bt-proxy-front
 
-  # Defaults
-  bt_default: RESTORE_DEFAULT_ON
-  ble_default: RESTORE_DEFAULT_ON
-
-  # BT stack must be initialized before we can call enable/disable actions
-  bt_setup_prio: 275.0
-
-  # Names and icons for HA
-  bt_name: "Bluetooth Proxy"
-  bt_icon: mdi:bluetooth
-  ble_name: "BLE Tracker"
-  ble_icon: mdi:bluetooth-connect
-  scan_mode_name: "Bluetooth Scan Mode"
-  scan_mode_icon: mdi:bluetooth-transfer
-
 packages:
+  bt: !include zi3-bt.yaml
   base: !include zi3-base.yaml
   board: !include zi3-board-eth.yaml
-
-bluetooth_proxy:
-  id: bt_proxy
-
-esp32_ble_tracker:
-  id: ble_tracker
-  scan_parameters:
-    continuous: False
-
-switch:
-  - platform: template
-    id: bt_enabled_switch
-    name: ${bt_name}
-    icon: ${bt_icon}
-    entity_category: config
-    optimistic: True
-    restore_mode: ${bt_default}
-    setup_priority: ${bt_setup_prio}
-    turn_on_action:
-      - ble.enable:
-    turn_off_action:
-      - ble.disable:
-  - platform: template
-    id: ble_enabled_switch
-    name: ${ble_name}
-    icon: ${ble_icon}
-    entity_category: config
-    optimistic: True
-    restore_mode: ${ble_default}
-    setup_priority: ${bt_setup_prio}
-    turn_on_action:
-      then:
-        - esp32_ble_tracker.start_scan:
-            continuous: True
-    turn_off_action:
-      then:
-        - esp32_ble_tracker.stop_scan:
-
-select:
-  - platform: template
-    id: scanner_mode
-    name: ${scan_mode_name}
-    icon: ${scan_mode_icon}
-    options:
-      - "Passive"
-      - "Active"
-    lambda: |-
-      if (id(ble_tracker).get_scan_active()) {
-        return {"Active"};
-      } else {
-        return {"Passive"};
-      }
-    set_action:
-      - lambda: |-
-          id(bt_proxy).bluetooth_scanner_set_mode(x == "Active");
-      - component.update: scanner_mode
