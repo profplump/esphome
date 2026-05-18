@@ -12,6 +12,22 @@ substitutions:
   # Hide some controls for this internal board
   builtin_rgb_disabled: True
 
+  # Restore the fan mode when available
+  fan_cmd_restore: RESTORE_DEFAULT_OFF
+
+  # NTC sensor calibration
+  temp_low_r: 43.4kOhm
+  temp_low_t: 71.8°F
+  temp_mid_r: 39.5kOhm
+  temp_mid_t: 76.0°F
+  temp_high_r: 35.0kOhm
+  temp_high_t: 91.4°F
+
+  # Increase temp_interval_filter to send slower, aggregated updates to HA
+  temp_interval: 15s
+  temp_interval_filter: 4
+  cal_interval_filter: ${temp_interval_filter}
+
   # Names and icons for HA
   fan_name: "Fan"
   fan_icon: mdi:fan
@@ -23,8 +39,13 @@ substitutions:
   speed_icon: mdi:fan-speed-3
   thermostat_name: "Thermostat Armed"
   thermostat_icon: mdi:thermostat-auto
+  temp_name: "Temperature"
+  temp_icon: mdi:thermometer
+  calibraiton_name: "NTC Resistance"
+  calibraiton_icon: mdi:thermostat-cog
 
 packages:
+  nvm: !include zi3-nvm.yaml
   board: !include zi3-board-s3-zero.yaml
 
 # Deal with the slightly insane initial state dynamics of binary_sensor
@@ -45,15 +66,15 @@ globals:
   - id: last_sync
     type: unsigned long
 
-# The baked-in fan interfaces speed-count and direction
 fan:
+  # HA fan interface
   - platform: template
     id: fan_cmd
     name: ${fan_name}
     icon: ${fan_icon}
     has_direction: True
     speed_count: 4
-    restore_mode: ALWAYS_OFF
+    restore_mode: ${fan_cmd_restore}
     on_state:
       - script.execute:
           id: set_power
@@ -120,6 +141,49 @@ sensor:
     icon: mdi:wrench-clock
     entity_category: diagnostic
     disabled_by_default: True
+
+  # NTC temperature sensor
+  - platform: adc
+    id: ntc_voltage
+    pin: GPIO02
+    attenuation: auto
+    update_interval: ${temp_interval}
+    internal: True
+  - platform: resistance
+    id: ntc_resistance
+    sensor: ntc_voltage
+    configuration: DOWNSTREAM
+    resistor: 100kOhm
+    internal: True
+  - platform: copy
+    id: calibration_resistance
+    source_id: ntc_resistance
+    name: ${calibraiton_name}
+    icon: ${calibraiton_icon}
+    entity_category: diagnostic
+    disabled_by_default: True
+    unit_of_measurement: "kOhmΩ"
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.001
+      - sliding_window_moving_average:
+          window_size: ${temp_interval_filter}
+          send_every: ${temp_interval_filter}
+  - platform: ntc
+    id: temperature
+    name: ${temp_name}
+    icon: ${temp_icon}
+    sensor: ntc_resistance
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+    calibration:
+      - ${temp_low_r} -> ${temp_low_t}
+      - ${temp_mid_r} -> ${temp_mid_t}
+      - ${temp_high_r} -> ${temp_high_t}
+    filters:
+      - sliding_window_moving_average:
+          window_size: ${temp_interval_filter}
+          send_every: ${temp_interval_filter}
 
 # Conditional clicking we need to send IR commands
 script:
@@ -268,7 +332,7 @@ script:
 
 # Raw IR command buttons
 # Used internally by the conditional clicker
-# Mostly disabled by default in HA, except for up/down which are used for the (non-smart) thermostat
+# Disabled by default in HA
 button:
   - platform: template
     id: power_click
@@ -287,12 +351,14 @@ button:
   - platform: template
     id: speed_up_click
     name: "Up"
+    disabled_by_default: True
     on_press:
       remote_transmitter.transmit_pronto:
         data: '0000 006D 0048 0000 0031 000F 0031 0010 0010 0031 0030 0012 002F 0012 002F 0012 000F 0032 000F 0032 000F 0032 002F 0012 002F 0012 000F 0134 002F 0012 002F 0012 000F 0032 002F 0012 002F 0012 002F 0012 000F 0032 000F 0032 000F 0032 002F 0012 002F 0012 000F 0134 002F 0012 002F 0011 000F 0032 002F 0012 002F 0012 002F 0012 000F 0032 000F 0032 000F 0032 002F 0012 002F 0011 000F 0134 002F 0012 002F 0012 000F 0032 002F 0012 002F 0012 002F 0012 000F 0032 000F 0032 000F 0032 002F 0012 002F 0012 000F 0134 002F 0012 002F 0012 000F 0032 002F 0012 002F 0012 002F 0012 000F 0032 000F 0032 000F 0032 002F 0012 002F 0012 000F 0134 002F 0012 002F 0012 000F 0032 002F 0012 002F 0012 002F 0012 000F 0032 000F 0032 000F 0032 002F 0012 002F 0012 000F 0181'
   - platform: template
     id: speed_down_click
     name: "Down"
+    disabled_by_default: True
     on_press:
       remote_transmitter.transmit_pronto:
         data: '0000 006D 0048 0000 0031 000F 0031 0010 0010 0031 0030 0012 002F 0012 000F 0032 000F 0032 000F 0032 000F 0032 000F 0032 002F 0012 000F 0134 002F 0012 002F 0012 000F 0032 002F 0012 002F 0012 000F 0032 000F 0032 000F 0032 000F 0032 000F 0032 002F 0012 000F 0134 002F 0012 002F 0012 000F 0032 002F 0012 002F 0012 000F 0032 000F 0032 000F 0032 000F 0032 000F 0032 002F 0012 000F 0134 002F 0012 002F 0012 000F 0032 002F 0012 002F 0012 000F 0032 000F 0032 000F 0032 000F 0032 000F 0032 002F 0012 000F 0134 002F 0012 002F 0012 000F 0032 002F 0012 002F 0012 000F 0032 000F 0032 000F 0032 000F 0032 000F 0032 002F 0012 000F 0134 002F 0012 002F 0012 000F 0032 002F 0012 002F 0012 000F 0032 000F 0032 000F 0032 000F 0032 000F 0032 002F 0012 000F 0181'
