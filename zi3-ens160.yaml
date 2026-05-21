@@ -1,0 +1,265 @@
+substitutions:
+  # Sensor connection defaults
+  ens160_i2c_bus: i2c_ens160
+  ens160_i2c_addr: 0x53
+  ens160_power_default: RESTORE_DEFAULT_ON
+
+  # Power pins
+  ens160_vcc: GPIO47
+  ens160_gnd: GPIO38
+
+  # Air quality constants and defaults
+  aqi_min: 1
+  aqi_max: 5
+  aqi_step: 1
+  aqi_alert: 3
+  tvoc_min: 10
+  tvoc_1: 65
+  tvoc_2: 220
+  tvoc_3: 660
+  tvoc_4: 2200
+  tvoc_max: 5500
+  tvoc_step: 50
+  tvoc_alert: 700
+  eco2_min: 10
+  eco2_1: 700
+  eco2_2: 900
+  eco2_3: 1100
+  eco2_4: 1600
+  eco2_max: 2200
+  eco2_alert: 1000
+  eco2_step: 50
+
+  # Air quality strings
+  text_low: "Low"
+  text_1: "Excellent"
+  text_2: "Good"
+  text_3: "Moderate"
+  text_4: "Poor"
+  text_5: "Unhealthy"
+  text_high: "High"
+  text_oor: "Out-of-range"
+
+  # Names and icons for HA - ENS160/AHT21
+  ens160_power_name: "Air Quality Sensor Power"
+  ens160_power_icon: mdi:toggle-switch
+  aqi_name: "AQI"
+  aqi_icon: mdi:lungs
+  tvoc_name: "TVOC"
+  tvoc_icon: mdi:volcano
+  eco2_name: "eCO2"
+  eco2_icon: mdi:molecule-co2
+  aht21_name: "AHT21"
+  text_name: "Text"
+  alert_name: "Alert"
+  alert_icon: mdi:bell-alert
+  threshold_name: "Threshold"
+  threshold_icon: mdi:plus-minus-variant
+
+sensor:
+  - platform: ens160_i2c
+    id: ens160_sensor
+    i2c_id: ${ens160_i2c_bus}
+    address: ${ens160_i2c_addr}
+    compensation:
+      temperature: temperature_aht21
+      humidity: humidity_aht21
+    aqi:
+      id: aqi
+      name: ${aqi_name}
+      icon: ${aqi_icon}
+      device_class: "aqi"
+      state_class: "measurement"
+      on_raw_value:
+        then:
+        - text_sensor.template.publish:
+            id: aqi_text
+            state: !lambda |-
+              if (x < 1) return "${text_oor} ${text_low}";
+              else if (x <= 1) return "${text_1}";
+              else if (x <= 2) return "${text_2}";
+              else if (x <= 3) return "${text_3}";
+              else if (x <= 4) return "${text_4}";
+              else if (x <= 5) return "${text_5}";
+              return "${text_oor} ${text_high}";
+        - binary_sensor.template.publish:
+            id: aqi_alert
+            state: !lambda return (x > id(aqi_alert_threshold).state);
+    tvoc:
+      id: tvoc
+      name: ${tvoc_name}
+      icon: ${tvoc_icon}
+      device_class: "volatile_organic_compounds"
+      state_class: "measurement"
+      unit_of_measurement: "ppb"
+      on_raw_value:
+       then:
+        - text_sensor.template.publish:
+            id: tovc_text
+            state: !lambda |-
+              if (x < ${tvoc_min}) return "${text_oor} ${text_low}";
+              else if (x < ${tvoc_1}) return "${text_1}";
+              else if (x < ${tvoc_2}) return "${text_2}";
+              else if (x < ${tvoc_3}) return "${text_3}";
+              else if (x < ${tvoc_4}) return "${text_4}";
+              else if (x < ${tvoc_max}) return "${text_5}";
+              return "${text_oor} ${text_high}";
+        - binary_sensor.template.publish:
+            id: tvoc_alert
+            state: !lambda return (x > id(tvoc_alert_threshold).state);
+    eco2:
+      id: eco2
+      name: ${eco2_name}
+      icon: ${eco2_icon}
+      device_class: "carbon_dioxide"
+      state_class: "measurement"
+      unit_of_measurement: "ppm"
+      on_raw_value:
+       then:
+        - text_sensor.template.publish:
+            id: eco2_text
+            state: !lambda |-
+              if (x < ${eco2_min}) return "${text_oor} ${text_low}";
+              else if (x < ${eco2_1}) return "${text_1}";
+              else if (x < ${eco2_2}) return "${text_2}";
+              else if (x < ${eco2_3}) return "${text_3}";
+              else if (x < ${eco2_4}) return "${text_4}";
+              else if (x < ${eco2_max}) return "${text_5}";
+              return "${text_oor} ${text_high}";
+        - binary_sensor.template.publish:
+            id: eco2_alert
+            state: !lambda return (x > id(eco2_alert_threshold).state);
+
+  # The ENS160 is paired with an AHT21, which we use internally for compensation
+  - platform: aht10
+    id: air_temp_humid
+    i2c_id: i2c_ens160
+    variant: AHT20
+    temperature:
+      id: temperature_aht21
+      name: "${temperature_name} - ${aht21_name}"
+      icon: ${temperature_icon}
+      disabled_by_default: True
+      device_class: "temperature"
+      state_class: "measurement"
+      unit_of_measurement: "°C"
+      accuracy_decimals: 1
+    humidity:
+      id: humidity_aht21
+      name: "${humidity_name} - ${aht21_name}"
+      icon: ${humidity_icon}
+      disabled_by_default: True
+      device_class: "humidity"
+      state_class: "measurement"
+      unit_of_measurement: "%"
+      accuracy_decimals: 0
+
+# Text versions of sensor data
+text_sensor:
+  - platform: template
+    id: aqi_text
+    name: "${aqi_name} ${text_name}"
+    icon: ${aqi_icon}
+  - platform: template
+    id: tovc_text
+    name: "${tvoc_name} ${text_name}"
+    icon: ${tvoc_icon}
+  - platform: template
+    id: eco2_text
+    name: "${eco2_name} ${text_name}"
+    icon: ${eco2_icon}
+
+# Alert flags
+binary_sensor:
+  - platform: template
+    id: aqi_alert
+    name: "${aqi_name} ${alert_name}"
+    icon: ${alert_icon}
+  - platform: template
+    id: tvoc_alert
+    name: "${tvoc_name} ${alert_name}"
+    icon: ${alert_icon}
+  - platform: template
+    id: eco2_alert
+    name: "${eco2_name} ${alert_name}"
+    icon: ${alert_icon}
+
+# Saved-state alert thresholds
+number:
+  - platform: template
+    id: aqi_alert_threshold
+    name: "${aqi_name} ${alert_name} ${threshold_name}"
+    icon: ${threshold_icon}
+    optimistic: True
+    step: ${aqi_step}
+    entity_category: config
+    min_value: ${aqi_min}
+    max_value: ${aqi_max}
+    initial_value: ${aqi_alert}
+    restore_value: True
+  - platform: template
+    id: tvoc_alert_threshold
+    name: "${tvoc_name} ${alert_name} ${threshold_name}"
+    icon: ${threshold_icon}
+    optimistic: True
+    step: ${tvoc_step}
+    entity_category: config
+    min_value: ${tvoc_min}
+    max_value: ${tvoc_max}
+    initial_value: ${tvoc_alert}
+    restore_value: True
+  - platform: template
+    id: eco2_alert_threshold
+    name: "${eco2_name} ${alert_name} ${threshold_name}"
+    icon: ${threshold_icon}
+    optimistic: True
+    step: ${eco2_step}
+    entity_category: config
+    min_value: ${eco2_min}
+    max_value: ${eco2_max}
+    initial_value: ${eco2_alert}
+    restore_value: True
+
+# You can disable this entirely in individual devices with:
+  # sensor:
+  #   - id: !remove ens160_power_switch
+  # output:
+  #   - id: !remove power_ens160_vcc
+  #   - id: !remove power_ens160_gnd
+  #   - id: !remove power_ens160
+switch:
+  - platform: template
+    id: ens160_power_switch
+    name: ${ens160_power_name}
+    icon: ${ens160_power_icon}
+    disabled_by_default: True
+    optimistic: True
+    restore_mode: ${ens160_power_default}
+    turn_on_action:
+      then:
+        - output.turn_on: power_ens160
+    turn_off_action:
+      then:
+        - output.turn_off: power_ens160
+
+# Sensor power via GPIO; the ENS160 draws ~20mA peak
+# This push-pull setup allows any 4 pins to service the sensor
+output:
+  - platform: gpio
+    id: power_ens160_vcc
+    pin: GPIO14
+  - platform: gpio
+    id: power_ens160_gnd
+    pin: GPIO13
+  - platform: template
+    type: binary
+    id: power_ens160
+    write_action: 
+      then:
+        - lambda: |-
+            id(power_ens160_gnd).turn_off();
+            if (state) {
+              id(power_ens160_vcc).turn_on();
+            } else {
+              id(power_ens160_vcc).turn_off();
+            }

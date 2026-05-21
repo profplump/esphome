@@ -1,0 +1,49 @@
+substitutions:
+  pin_power_name: "Power Switch"
+  pin_power_icon: mdi:toggle-switch
+  pin_power_internal: True
+  pin_power_restore: RESTORE_DEFAULT_ON
+  pin_power_prefix: ""
+  pin_power_vcc: GPIO01
+  pin_power_gnd: GPIO02
+  pin_power_none: "none"
+
+switch:
+  - platform: template
+    id: ${pin_power_prefix}power_switch
+    name: ${pin_power_name}
+    icon: ${pin_power_icon}
+    internal: ${pin_power_internal}
+    disabled_by_default: True
+    optimistic: True
+    restore_mode: ${pin_power_restore}
+    turn_on_action:
+      then:
+        - output.turn_on: ${pin_power_prefix}power
+    turn_off_action:
+      then:
+        - output.turn_off: ${pin_power_prefix}power
+
+# Power via GPIO. Pulse your sensors, or use any pad to attach power and data lines
+# Be sure to limit current to something your chip can safely source, (likely 20mA or less)
+output:
+  - platform: gpio
+    id: ${pin_power_prefix}vcc
+    pin: ${pin_power_vcc}
+  - platform: gpio
+    id: ${pin_power_prefix}gnd
+    pin: ${pin_power_gnd}
+  - platform: template
+    type: binary
+    id: ${pin_power_prefix}power
+    write_action: 
+      then:
+        - lambda: |-
+            if ("${pin_power_gnd}" != "${pin_power_none}") {
+              id(${pin_power_prefix}gnd).turn_off();
+            }
+            if ("${pin_power_vcc}" != "${pin_power_none}" && state) {
+              id(${pin_power_prefix}vcc).turn_on();
+            } else {
+              id(${pin_power_prefix}vcc).turn_off();
+            }

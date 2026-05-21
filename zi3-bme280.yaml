@@ -1,0 +1,54 @@
+substitutions:
+  # Sensor connection defaults
+  bme280_i2c_bus: i2c_bme280
+  bme280_i2c_addr: 0x76
+
+  # Sensor defaults
+  bme280_interval: 60s
+  bme280_iir: 2X
+  temperature_sample: 16X
+  pressure_sample: ${temperature_sample}
+  humidity_sample: ${temperature_sample}
+
+  # Names and icons for HA
+  temperature_name: "Temperature"
+  temperature_icon: mdi:thermometer
+  humidity_name: "Humidity"
+  humidity_icon: mdi:water-percent
+  pressure_name: "Pressure"
+  pressure_icon: mdi:weather-dust
+
+sensor:
+  - platform: bme280_i2c
+    id: bme280_sensor
+    i2c_id: ${bme280_i2c_bus}
+    address: ${bme280_i2c_addr}
+    update_interval: ${bme280_interval}
+    iir_filter: ${bme280_iir}
+    temperature:
+      id: temperature
+      name: ${temperature_name}
+      icon: ${temperature_icon}
+      oversampling: ${temperature_sample}
+      device_class: "temperature"
+      state_class: "measurement"
+      unit_of_measurement: "°C"
+      accuracy_decimals: 1
+    pressure:
+      id: pressure
+      name: ${pressure_name}
+      icon: ${pressure_icon}
+      oversampling: ${pressure_sample}
+      device_class: "pressure"
+      state_class: "measurement"
+      unit_of_measurement: "Pa"
+      accuracy_decimals: 0
+    humidity:
+      id: humidity
+      name: ${humidity_name}
+      icon: ${humidity_icon}
+      oversampling: ${humidity_sample}
+      device_class: "humidity"
+      state_class: "measurement"
+      unit_of_measurement: "%"
+      accuracy_decimals: 0
