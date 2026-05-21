@@ -13,7 +13,7 @@ api:
 
 ota:
   - platform: esphome
-    id: self_ota
+    id: ota_self
     password: ${ota_key}
 
 binary_sensor:
