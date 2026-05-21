@@ -1,19 +1,18 @@
 substitutions:
-   # temp_interval * temp_samples = HA update rate
-  temp_interval: 1s
-  temp_samples: 60
-  temp_settle: 1ms
   temp_disabled: False
-  temp_power: !include {file: zi3-pinpower.yaml}
+  ntc_include: !include { file: zi3-ntc.yaml }
 
-  # NTC sensor calibration
+  # NTC sensor
+  ntc_vcc: GPIO01
+  ntc_pin: GPIO02
+  ntc_gnd: {number: GPIO03, ignore_strapping_warning: True}
   # 470kOhm bypass reads 17°F
   # 100kOhm bypass reads 76°F
-  temp_cal_low: "470kOhm -> 17°F"
-  temp_cal_mid: "100kOhm -> 76°F"
-  #temp_cal_low: "43.4kOhm -> 71.8°F"
-  #temp_cal_mid: "39.5kOhm -> 76.0°F"
-  temp_cal_high: "35.0kOhm -> 91.4°F"
+  #ntc_cal_low: "43.4kOhm -> 71.8°F"
+  #ntc_cal_mid: "39.5kOhm -> 76.0°F"
+  ntc_cal_low: "470kOhm -> 17°F"
+  ntc_cal_mid: "100kOhm -> 76°F"
+  ntc_cal_high: "35.0kOhm -> 91.4°F"
 
   # IR timings
   cmd_timeout: 3000
@@ -24,13 +23,6 @@ substitutions:
   sync_timeout: 5
   power_cmd_delay: 3000
   diag_resolution: 5000
-
-  # NTC power via GPIO
-  pin_power_vcc: GPIO01
-  pin_power_gnd: {number: GPIO03, ignore_strapping_warning: True}
-  pin_power_name: "NTC Power"
-  pin_power_icon: mdi:toggle-switch
-  pin_power_prefix: "ntc_"
 
   # Hide some controls for this internal board
   builtin_rgb_internal: True
@@ -49,15 +41,11 @@ substitutions:
   speed_icon: mdi:fan-speed-3
   thermostat_name: "Thermostat Armed"
   thermostat_icon: mdi:thermostat-auto
-  temp_name: "Temperature"
-  temp_icon: mdi:thermometer
-  calibraiton_name: "NTC Resistance"
-  calibraiton_icon: mdi:thermostat-cog
 
 packages:
   nvm: !include zi3-nvm.yaml
   board: !include zi3-board-s3-zero.yaml
-  pinpower: ${ temp_power if not temp_disabled else {} }
+  ntc: ${ ntc_include if not temp_disabled else {} }
 
 # Deal with the slightly insane initial state dynamics of binary_sensor
 # These will be reset to their true values with the next motor UART message
@@ -149,63 +137,6 @@ sensor:
     entity_category: diagnostic
     accuracy_decimals: 0
     disabled_by_default: True
-
-  # NTC temperature sensor
-  - platform: adc
-    id: ntc_voltage
-    pin: GPIO02
-    attenuation: auto
-    update_interval: never
-    internal: True
-  - platform: resistance
-    id: ntc_resistance
-    sensor: ntc_voltage
-    configuration: DOWNSTREAM
-    resistor: 100kOhm
-    internal: True
-  - platform: copy
-    id: calibration_resistance
-    internal: ${temp_disabled}
-    source_id: ntc_resistance
-    name: ${calibraiton_name}
-    icon: ${calibraiton_icon}
-    entity_category: diagnostic
-    disabled_by_default: True
-    unit_of_measurement: "kΩ"
-    accuracy_decimals: 1
-    filters:
-      - multiply: 0.001
-      - sliding_window_moving_average:
-          window_size: ${temp_samples}
-          send_every: ${temp_samples}
-          send_first_at: ${temp_samples}
-  - platform: ntc
-    id: temperature
-    internal: ${temp_disabled}
-    name: ${temp_name}
-    icon: ${temp_icon}
-    sensor: ntc_resistance
-    unit_of_measurement: "°C"
-    accuracy_decimals: 1
-    calibration:
-      - ${temp_cal_low}
-      - ${temp_cal_mid}
-      - ${temp_cal_high}
-    filters:
-      - sliding_window_moving_average:
-          window_size: ${temp_samples}
-          send_every: ${temp_samples}
-          send_first_at: ${temp_samples}
-
-# Probe the temperature frequently, but don't waste power
-interval:
-  - interval: ${temp_interval}
-    then:
-      - switch.turn_on: ntc_power_switch
-      - delay: ${temp_settle}
-      - component.update: ntc_voltage
-      - delay: ${temp_settle}
-      - switch.turn_off: ntc_power_switch
 
 # Conditional clicking we need to send IR commands
 script:

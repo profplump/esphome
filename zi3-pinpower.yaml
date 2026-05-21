@@ -6,7 +6,6 @@ substitutions:
   pin_power_prefix: ""
   pin_power_vcc: GPIO01
   pin_power_gnd: GPIO02
-  pin_power_none: "none"
 
 switch:
   - platform: template
@@ -39,10 +38,8 @@ output:
     write_action: 
       then:
         - lambda: |-
-            if ("${pin_power_gnd}" != "${pin_power_none}") {
-              id(${pin_power_prefix}gnd).turn_off();
-            }
-            if ("${pin_power_vcc}" != "${pin_power_none}" && state) {
+            id(${pin_power_prefix}gnd).turn_off();
+            if (state) {
               id(${pin_power_prefix}vcc).turn_on();
             } else {
               id(${pin_power_prefix}vcc).turn_off();

@@ -1,0 +1,91 @@
+substitutions:
+  # ntc_interval * ntc_samples = HA update rate
+  ntc_interval: 1s
+  ntc_samples: 60
+  ntc_settle: 1ms
+  ntc_internal: False
+
+  # NTC config
+  ntc_vcc: GPIO01
+  ntc_pin: GPIO02
+  ntc_gnd: GPIO03
+  ntc_cal_low: "470kOhm -> 17°F"
+  ntc_cal_mid: "100kOhm -> 76°F"
+  ntc_cal_high: "35.0kOhm -> 91.4°F"
+
+  # Power config
+  pin_power_vcc: ${ntc_vcc}
+  pin_power_gnd: ${ntc_gnd}
+  pin_power_name: "NTC Power"
+  pin_power_icon: mdi:toggle-switch
+  pin_power_prefix: "ntc_"
+
+  # Names and icons for HA
+  ntc_temperature_name: "Temperature"
+  ntc_temperature_icon: mdi:thermometer
+  ntc_calibraiton_name: "NTC Resistance"
+  ntc_calibraiton_icon: mdi:thermostat-cog
+
+packages:
+  pinpower: !include zi3-pinpower.yaml
+
+# Probe the temperature frequently, but don't waste power
+interval:
+  - interval: ${ntc_interval}
+    then:
+      - switch.turn_on: ntc_power_switch
+      - delay: ${ntc_settle}
+      - component.update: ntc_voltage
+      - delay: ${ntc_settle}
+      - switch.turn_off: ntc_power_switch
+
+sensor:
+  # NTC temperature sensor
+  - platform: adc
+    id: ntc_voltage
+    pin: ${ntc_pin}
+    attenuation: auto
+    update_interval: never
+    internal: True
+  # NTC voltage as resistance
+  - platform: resistance
+    id: ntc_resistance
+    sensor: ntc_voltage
+    configuration: DOWNSTREAM
+    resistor: 100kOhm
+    internal: True
+  # A human-friendly copy of resistance
+  - platform: copy
+    id: ntc_calibration_resistance
+    internal: ${ntc_internal}
+    source_id: ntc_resistance
+    name: ${ntc_calibraiton_name}
+    icon: ${ntc_calibraiton_icon}
+    entity_category: diagnostic
+    disabled_by_default: True
+    unit_of_measurement: "kΩ"
+    accuracy_decimals: 1
+    filters:
+      - multiply: 0.001
+      - sliding_window_moving_average:
+          window_size: ${ntc_samples}
+          send_every: ${ntc_samples}
+          send_first_at: ${ntc_samples}
+  # Actual NTC temperature
+  - platform: ntc
+    id: ntc_temperature
+    internal: ${ntc_internal}
+    name: ${ntc_temperature_name}
+    icon: ${ntc_temperature_icon}
+    sensor: ntc_resistance
+    unit_of_measurement: "°C"
+    accuracy_decimals: 1
+    calibration:
+      - ${ntc_cal_low}
+      - ${ntc_cal_mid}
+      - ${ntc_cal_high}
+    filters:
+      - sliding_window_moving_average:
+          window_size: ${ntc_samples}
+          send_every: ${ntc_samples}
+          send_first_at: ${ntc_samples}
