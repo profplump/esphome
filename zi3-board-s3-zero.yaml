@@ -5,7 +5,7 @@ substitutions:
   builtin_rgb_name: "Builtin RGB"
   builtin_rgb_icon: mdi:head-lightbulb-outline
   builtin_rgb_rmt: 48
-  builtin_rgb_disabled: False
+  builtin_rgb_internal: False
 
   # Older revisions have quad-4MB PSRAM
   zero_flash_size: 4MB
@@ -33,7 +33,7 @@ light:
     id: builtin_rgb
     name: ${builtin_rgb_name}
     icon: ${builtin_rgb_icon}
-    disabled_by_default: ${builtin_rgb_disabled}
+    internal: ${builtin_rgb_internal}
     pin:
       number: GPIO21
     chipset: WS2812

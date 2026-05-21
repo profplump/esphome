@@ -30,22 +30,12 @@ esphome:
     board_build.flash_mode: qio
 
 output:
-  # Builtin mono LED and scaler
+  # Builtin mono LED
   - platform: ledc
-    id: builtin_mono_led
-    pin:
-      number: GPIO21
-      inverted: True
-  - platform: template
-    type: float
     id: builtin_mono_lamp
-    write_action:
-      then:
-        - output.set_level:
-            id: builtin_mono_led
-            level: !lambda |-
-              float k = (1.0f - ${builtin_mono_min}f) / 0.99f;
-              return (state > 0.0f) ? (k * state) + ${builtin_mono_min} : 0.0f;
+    pin: {number: GPIO21, inverted: True}
+    min_power: ${builtin_mono_min}
+    zero_means_zero: True
 
 light:
   - platform: monochromatic

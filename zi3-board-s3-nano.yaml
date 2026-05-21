@@ -5,8 +5,10 @@ substitutions:
   nano_flash_size: 16MB
   builtin_rgb_name: "Builtin RGB"
   builtin_rgb_icon: mdi:head-lightbulb-outline
+  builtin_rgb_internal: False
   builtin_mono_name: "Builtin Mono"
   builtin_mono_icon: mdi:head-lightbulb-outline
+  builtin_mono_internal: ${builtin_rgb_internal}
 
   # Lamp constants
   builtin_mono_min: 0.01
@@ -25,13 +27,14 @@ esp32:
 psram:
   mode: octal
   speed: 80MHz
-  ignore_not_found: false
+  ignore_not_found: False
 
 light:
   - platform: rgb
     id: builtin_rgb
     name: ${builtin_rgb_name}
     icon: ${builtin_rgb_icon}
+    internal: ${builtin_rgb_internal}
     red: builtin_red_lamp
     green: builtin_green_lamp
     blue: builtin_blue_lamp
@@ -39,75 +42,43 @@ light:
     id: builtin_mono
     name: ${builtin_mono_name}
     icon: ${builtin_mono_icon}
+    internal: ${builtin_mono_internal}
     output: builtin_mono_lamp
 
 output:
   - platform: ledc
-    id: builtin_mono_led
+    id: builtin_mono_lamp
     # This is also the SCK line
     pin: GPIO48
-  - platform: template
-    type: float
-    id: builtin_mono_lamp
-    write_action:
-      then:
-        - output.set_level:
-            id: builtin_mono_led
-            level: !lambda |-
-              float k = (1.0f - ${builtin_mono_min}f) / 0.99f;
-              return (state > 0.0f) ? (k * state) + ${builtin_mono_min} : 0.0f;
+    min_power: ${builtin_mono_min}
+    zero_means_zero: True
 
   - platform: ledc
-    id: builtin_blue_led
+    id: builtin_blue_lamp
     pin:
       number: GPIO45
       ignore_strapping_warning: True
     inverted: True
-  - platform: template
-    type: float
-    id: builtin_blue_lamp
-    write_action:
-      then:
-        - output.set_level:
-            id: builtin_blue_led
-            level: !lambda |-
-              float k = (1.0f - ${builtin_blue_min}f) / 0.99f;
-              return (state > 0.0f) ? (k * state) + ${builtin_blue_min} : 0.0f;
+    min_power: ${builtin_blue_min}
+    zero_means_zero: True
 
   - platform: ledc
-    id: builtin_red_led
+    id: builtin_red_lamp
     pin:
       number: GPIO46
       ignore_strapping_warning: True
     inverted: True
-  - platform: template
-    type: float
-    id: builtin_red_lamp
-    write_action:
-      then:
-        - output.set_level:
-            id: builtin_red_led
-            level: !lambda |-
-              float k = (1.0f - ${builtin_red_min}f) / 0.99f;
-              return (state > 0.0f) ? (k * state) + ${builtin_red_min} : 0.0f;
+    min_power: ${builtin_red_min}
+    zero_means_zero: True
 
   - platform: ledc
-    id: builtin_green_led
+    id: builtin_green_lamp
     pin:
       number: GPIO0
       ignore_strapping_warning: True
     inverted: True
-  - platform: template
-    type: float
-    id: builtin_green_lamp
-    write_action:
-      then:
-        - output.set_level:
-            id: builtin_green_led
-            level: !lambda |-
-              float k = (1.0f - ${builtin_green_min}f) / 0.99f;
-              return (state > 0.0f) ? (k * state) + ${builtin_green_min} : 0.0f;
-
+    min_power: ${builtin_green_min}
+    zero_means_zero: True
 
 # Pin map
 # D13: GPIO48 (SCK)
