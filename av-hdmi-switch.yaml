@@ -9,11 +9,9 @@ substitutions:
   autoswitch_boot_restore: RESTORE_DEFAULT_OFF
   # Save the at-boot config, default to "1" if config lost
   hdmi_input_boot_default: "1"
+  # Input debounce interval
+  input_debounce: 10ms
   
-  # Changes apply immediately but only get flashed eventually
-  # Click "Save to Flash" in HA to force a write
-  flash_write_interval: 15s
-
   # Names and icons for HA
   autoswitch_name: "Auto Switch"
   autoswitch_icon: mdi:auto-fix
@@ -36,9 +34,7 @@ esphome:
   # Sync hardware to the input & autoswitch defaults @ late boot
   - priority: 100
     then:
-      - script.execute:
-          id: auto_enable
-          enable: False
+      - script.execute: {id: auto_enable, enable: False}
       - if:
           condition:
             - switch.is_on: autoswitch_boot
@@ -59,10 +55,8 @@ globals:
 uart:
   id: uart_hdmi
   baud_rate: 19200
-  rx_pin: 
-    number: GPIO44
-  tx_pin:
-    number: GPIO43
+  rx_pin: GPIO44
+  tx_pin: GPIO43
     #ignore_strapping_warning: True
   debug:
     direction: BOTH
@@ -82,14 +76,10 @@ switch:
     lambda: 'return id(autoswitch).state;'
     turn_on_action: 
       then:
-        - script.execute:
-            id: auto_enable
-            enable: True
+        - script.execute: {id: auto_enable, enable: True}
     turn_off_action: 
       then:
-        - script.execute:
-            id: auto_enable
-            enable: False
+        - script.execute: {id: auto_enable, enable: False}
   # Auto-switching boot config
   - platform: template
     id: autoswitch_boot
@@ -112,11 +102,7 @@ select:
     name: "${input_name}"
     icon: ${input_icon}
     initial_option: "1"
-    options:
-      - "1"
-      - "2"
-      - "3"
-      - "4"
+    options: [ "1", "2", "3", "4" ]
     set_action: 
       then:
         - script.execute:
@@ -129,11 +115,7 @@ select:
     icon: ${boot_icon}
     entity_category: config
     lambda: return esphome::to_string(id(input_default));
-    options:
-      - "1"
-      - "2"
-      - "3"
-      - "4"
+    options: [ "1", "2", "3", "4" ]
     set_action:
       then:
         - lambda: id(input_default) = std::atoi(x.c_str());
@@ -167,68 +149,54 @@ sensor:
 
 # Read the individual ready and active lights from each input channel
 # Active sensors are internal-only; we publish the binary sensor map instead
-# The active voltage is a little low (~2V); debounce to avoid flapping
+.filter: &input_filters
+  filters:
+    - delayed_on_off: ${input_debounce}
 binary_sensor:
   - platform: gpio
     id: active_1
     internal: True
-    pin:
-      number: GPIO01
-    filters:
-      - delayed_on_off: 10ms
+    pin: GPIO01
+    <<: *input_filters
   - platform: gpio
     id: active_2
     internal: True
-    pin:
-      number: GPIO07
-    filters:
-      - delayed_on_off: 10ms
+    pin: GPIO07
+    <<: *input_filters
   - platform: gpio
     id: active_3
     internal: True
-    pin:
-      number: GPIO04
-    filters:
-      - delayed_on_off: 10ms
+    pin: GPIO04
+    <<: *input_filters
   - platform: gpio
     id: active_4
     internal: True
-    pin:
-      number: GPIO06
-    filters:
-      - delayed_on_off: 10ms
+    pin: GPIO06
+    <<: *input_filters
   - platform: gpio
     id: ready_1
     name: "${input_name} 1 ${ready_name}"
     icon: ${ready_icon}
-    pin:
-      number: GPIO03
-    filters:
-      - delayed_on_off: 10ms
+    pin: GPIO03
+    <<: *input_filters
   - platform: gpio
     id: ready_2
     name: "${input_name} 2 ${ready_name}"
     icon: ${ready_icon}
-    pin:
-      number: GPIO09
-    filters:
-      - delayed_on_off: 10ms
+    pin: GPIO09
+    <<: *input_filters
   - platform: gpio
     id: ready_3
     name: "${input_name} 3 ${ready_name}"
     icon: ${ready_icon}
-    pin:
-      number: GPIO02
-    filters:
-      - delayed_on_off: 10ms
+    pin: GPIO02
+    <<: *input_filters
   - platform: gpio
     id: ready_4
     name: "${input_name} 4 ${ready_name}"
     icon: ${ready_icon}
-    pin:
-      number: GPIO05
-    filters:
-      - delayed_on_off: 10ms
+    pin: GPIO05
+    <<: *input_filters
 
 script:
   # Select the HDMI input by index
@@ -265,47 +233,35 @@ button:
     id: i_1
     name: "${input_name} 1"
     on_press:
-      - script.execute: 
-          id: input_switch
-          opt_value: "1"
+      - script.execute: {id: input_switch, opt_value: "1"}
     disabled_by_default: True
   - platform: template
     id: i_2
     name: "${input_name} 2"
     on_press:
-      - script.execute: 
-          id: input_switch
-          opt_value: "2"
+      - script.execute: {id: input_switch, opt_value: "2"}
     disabled_by_default: True
   - platform: template
     id: i_3
     name: "${input_name} 3"
     on_press:
-      - script.execute: 
-          id: input_switch
-          opt_value: "3"
+      - script.execute: {id: input_switch, opt_value: "3"}
     disabled_by_default: True
   - platform: template
     id: i_4
     name: "${input_name} 4"
     on_press:
-      - script.execute: 
-          id: input_switch
-          opt_value: "4"
+      - script.execute: {id: input_switch, opt_value: "4"}
     disabled_by_default: True
   - platform: template
     id: a_on
     name: "${autoswitch_name} - Enable"
     on_press:
-      - script.execute: 
-          id: auto_enable
-          enable: True
+      - script.execute: {id: auto_enable, enable: True}
     disabled_by_default: True
   - platform: template
     id: a_off
     name: "${autoswitch_name} - Disable"
     on_press:
-      - script.execute: 
-          id: auto_enable
-          enable: False
+      - script.execute: {id: auto_enable, enable: False}
     disabled_by_default: True
