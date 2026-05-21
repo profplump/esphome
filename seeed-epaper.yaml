@@ -1,10 +1,16 @@
 substitutions:
   name: esp32-seeed-epaper
-  friendly_name: "Seeed ePaper"
+  friendly_name: "ePaper - Buttons"
   api_key: !secret api-seeed-epaper
   ota_key: !secret ota-seeed-epaper
   ap_key: !secret ap-seeed-epaper
-  font_size: 60
+
+  font_size: 80
+  font2_size: 40
+  qr_scale: 4
+  tab_size: ${font2_size}
+  #door_code: "7738"
+  #wifi_passwd: "tocsin-clammy-marae"
 
 packages:
   base: !include zi3-base.yaml
@@ -12,7 +18,7 @@ packages:
 
 api:
   on_client_connected:
-    - delay: 250ms
+    - delay: 500ms
     - component.update: big_display
 
 binary_sensor:
@@ -33,49 +39,28 @@ font:
   - file: "Roboto-Regular.ttf"
     id: roboto
     size: ${font_size}
+  - file: "Roboto-Regular.ttf"
+    id: roboto2
+    size: ${font2_size}
 
 # Data from HA
 text_sensor:
   - platform: homeassistant
-    entity_id: weather.forecast_home
-    id: ha_weather
+    entity_id: sensor.guest_door
+    id: ha_door
+    attribute: "code"
   - platform: homeassistant
-    entity_id: weather.forecast_home
-    id: ha_temp_unit
-    attribute: "temperature_unit"
+    entity_id: sensor.guest_wifi
+    id: ha_wifi_name
+    attribute: "name"
   - platform: homeassistant
-    entity_id: weather.forecast_home
-    id: ha_pressure_unit
-    attribute: "pressure_unit"
-  - platform: homeassistant
-    entity_id: weather.forecast_home
-    id: ha_wind_unit
-    attribute: "wind_speed_unit"
-sensor:
-  - platform: homeassistant
-    entity_id: weather.forecast_home
-    id: ha_temp
-    attribute: "temperature"
-  - platform: homeassistant
-    entity_id: weather.forecast_home
-    id: ha_pressure
-    attribute: "pressure"
-  - platform: homeassistant
-    entity_id: weather.forecast_home
-    id: ha_wind
-    attribute: "wind_speed"
-  - platform: homeassistant
-    entity_id: weather.forecast_home
-    id: ha_wind_dir
-    attribute: "wind_bearing"
-  - platform: homeassistant
-    entity_id: weather.forecast_home
-    id: ha_humidity
-    attribute: "humidity"
-  - platform: homeassistant
-    entity_id: weather.forecast_home
-    id: ha_cloud
-    attribute: "cloud_coverage"
+    entity_id: sensor.guest_wifi
+    id: ha_wifi_key
+    attribute: "key"
+
+qr_code:
+  - id: wifi_qr
+    value: ""
 
 display:
   - platform: waveshare_epaper
@@ -89,9 +74,35 @@ display:
       number: GPIO4
       inverted: True
     update_interval: never
+    rotation: 180
     lambda: |-
-      it.printf(0, 0*60, id(roboto), "Temperature: %d %s", int(id(ha_temp).state), id(ha_temp_unit).state.c_str());
-      it.printf(0, 1*60, id(roboto), "Cloud: %d%% %s", int(id(ha_cloud).state), id(ha_weather).state.c_str());
-      it.printf(0, 2*60, id(roboto), "Humidity: %.1f%%", id(ha_humidity).state);
-      it.printf(0, 3*60, id(roboto), "Wind: %.1f %s @ %d°", id(ha_wind).state, id(ha_wind_unit).state.c_str(), int(id(ha_wind_dir).state));
-      it.printf(0, 4*60, id(roboto), "Pressure: %.1f %s", id(ha_pressure).state, id(ha_pressure_unit).state.c_str());
+      Color black = Color(255,255,255);
+      id(wifi_qr).set_value(
+        (std::string)"WIFI:S:" +
+        id(ha_wifi_name).state +
+        (std::string)";T:WPA;P:" +
+        id(ha_wifi_key).state +
+        (std::string)";;");
+
+      int i = 0;
+      it.printf(it.get_width() / 2, i, id(roboto), TextAlign::TOP_CENTER, "Peter");
+      i += ${font_size};
+
+      i += ${font2_size};
+      it.printf(0, i, id(roboto2), "Arrival:");
+      it.printf(it.get_width(), i, id(roboto2), TextAlign::TOP_RIGHT, "2026-05-21 @   2 PM");
+      i += ${font2_size};
+      it.printf(0, i, id(roboto2), "Departure:");
+      it.printf(it.get_width(), i, id(roboto2), TextAlign::TOP_RIGHT, "2026-05-22 @ 12 PM");
+      i += ${font2_size};
+
+      i += ${font2_size};
+      it.printf(0, i, id(roboto2), "Door Code: %s", id(ha_door).state);
+
+      i += ${font2_size};
+      i += ${font2_size};
+      int q_bottom = i + (id(wifi_qr).get_size() * ${qr_scale});
+      it.qr_code((it.get_width() - (id(wifi_qr).get_size() * ${qr_scale})) - ${tab_size}, i, id(wifi_qr), black, ${qr_scale});
+      it.printf(0, i, id(roboto2), "WiFi: %s", id(ha_wifi_name).state);
+      i += ${font2_size};
+      it.printf(${tab_size}, i, id(roboto2), "%s", id(ha_wifi_key).state);

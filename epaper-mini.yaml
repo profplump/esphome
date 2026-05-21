@@ -5,7 +5,7 @@ substitutions:
   ota_key: !secret ota-epaper-mini
   ap_key: !secret ap-epaper-mini
 
-  font_size: 60
+  font_size: 30
 
 packages:
   base: !include zi3-base.yaml
