@@ -27,27 +27,21 @@ substitutions:
   rgb_name: "RGB"
   rgb_icon: mdi:lava-lamp
 
+  # BME280 power via GPIO
+  pin_power_vcc: GPIO04
+  pin_power_gnd: GPIO03
+  pin_power_prefix: "bme280_"
+
 packages:
   base: !include zi3-base.yaml
   board: !include zi3-board-c3-zero.yaml
+  bme280: !include zi3-bme280.yaml
+  pinpower: !include zi3-pinpower.yaml
 
-esphome:
-  on_boot:
-  # RGB to amber @ early boot
-  - priority: 600
-    then:
-      - light.turn_on:
-          id: light_rgb
-          brightness: ${start_bright}
-          red: 50%
-          blue: 0%
-          green: 25%
-  # RGB to default (and trigger on_turn_on) @ boot complete
-  - priority: -100
-    then:
-      - light.turn_on:
-          id: light_rgb
-          brightness: ${rgb_bright}
+i2c:
+  - id: i2c_bme280
+    sda: GPIO20
+    scl: GPIO21
 
 globals:
   # Store the effect while dimming
@@ -58,10 +52,7 @@ globals:
 
 remote_receiver:
   # 433MHz RF
-  pin:
-    number: GPIO05
-    inverted: True
-    mode: INPUT_PULLUP
+  pin: {number: GPIO05, inverted: True, mode: INPUT_PULLUP}
   filter: 200us
   tolerance: 50%
   idle: 4ms
@@ -224,53 +215,26 @@ script:
       - lambda: id(light_rgb).make_call().set_effect(id(last_effect)).perform();
 
 output:
-  # Red PWM & scaler
+  # Red PWM
   - platform: ledc
-    id: led_red
-    pin: GPIO00
-  - platform: template
-    type: float
     id: lamp_red
-    write_action: 
-      then:
-        - output.set_level:
-            id: led_red
-            level: !lambda |-
-              float k = (1.0f - ${red_min}f) / 0.99f;
-              return (state > 0.0f) ? (k * state) + ${red_min} : 0.0f;
+    pin: GPIO00
+    min_power: ${red_min}
+    zero_means_zero: True
 
-  # Blue PWM & scaler
+  # Blue PWM
   - platform: ledc
-    id: led_blue
-    pin:
-      number: GPIO02
-      ignore_strapping_warning: True
-  - platform: template
-    type: float
     id: lamp_blue
-    write_action: 
-      then:
-        - output.set_level:
-            id: led_blue
-            level: !lambda |-
-              float k = (1.0f - ${blue_min}f) / 0.99f;
-              return (state > 0.0f) ? (k * state) + ${blue_min} : 0.0f;
+    pin: {number: GPIO02, ignore_strapping_warning: True}
+    min_power: ${blue_min}
+    zero_means_zero: True
 
-  # Green PWM & scaler
+  # Green PWM
   - platform: ledc
-    id: led_green
-    pin:
-      number: GPIO01
-  - platform: template
-    type: float
     id: lamp_green
-    write_action: 
-      then:
-        - output.set_level:
-            id: led_green
-            level: !lambda |-
-              float k = ((1.0f - ${green_min}f) / 0.99f);
-              return (state > 0.0f) ? (k * state) + ${green_min} : 0.0f;
+    pin: GPIO01
+    min_power: ${green_min}
+    zero_means_zero: True
 
 light:
   # Main RGB light
@@ -306,3 +270,21 @@ light:
             effect: random
         # Cancel delay-off
         - script.stop: delay_off
+
+esphome:
+  on_boot:
+  # RGB to amber @ early boot
+  - priority: 600
+    then:
+      - light.turn_on:
+          id: light_rgb
+          brightness: ${start_bright}
+          red: 50%
+          blue: 0%
+          green: 25%
+  # RGB to default (and trigger on_turn_on) @ boot complete
+  - priority: -100
+    then:
+      - light.turn_on:
+          id: light_rgb
+          brightness: ${rgb_bright}
