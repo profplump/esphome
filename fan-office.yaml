@@ -5,6 +5,9 @@ substitutions:
   ota_key: !secret ota-fan-office
   ap_key: !secret ap-fan-office
 
+  # This unit does not have an NTC connected
+  temp_disabled: True
+
 packages:
   base: !include zi3-base.yaml
   fan: !include zi3-fan-transom.yaml

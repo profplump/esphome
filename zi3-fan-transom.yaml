@@ -1,5 +1,21 @@
 substitutions:
-  # Timings
+   # temp_interval * temp_samples = HA update rate
+  temp_interval: 1s
+  temp_samples: 60
+  temp_settle: 1ms
+  temp_disabled: False
+  temp_power: !include {file: zi3-pinpower.yaml}
+
+  # NTC sensor calibration
+  # 470kOhm bypass reads 17°F
+  # 100kOhm bypass reads 76°F
+  temp_cal_low: "470kOhm -> 17°F"
+  temp_cal_mid: "100kOhm -> 76°F"
+  #temp_cal_low: "43.4kOhm -> 71.8°F"
+  #temp_cal_mid: "39.5kOhm -> 76.0°F"
+  temp_cal_high: "35.0kOhm -> 91.4°F"
+
+  # IR timings
   cmd_timeout: 3000
   cmd_retry: "333ms"
   cmd_thermostat_timeout: ${cmd_timeout}
@@ -9,24 +25,18 @@ substitutions:
   power_cmd_delay: 3000
   diag_resolution: 5000
 
+  # NTC power via GPIO
+  pin_power_vcc: GPIO01
+  pin_power_gnd: {number: GPIO03, ignore_strapping_warning: True}
+  pin_power_name: "NTC Power"
+  pin_power_icon: mdi:toggle-switch
+  pin_power_prefix: "ntc_"
+
   # Hide some controls for this internal board
-  builtin_rgb_disabled: True
+  builtin_rgb_internal: True
 
   # Restore the fan mode when available
   fan_cmd_restore: RESTORE_DEFAULT_OFF
-
-  # NTC sensor calibration
-  temp_low_r: 43.4kOhm
-  temp_low_t: 71.8°F
-  temp_mid_r: 39.5kOhm
-  temp_mid_t: 76.0°F
-  temp_high_r: 35.0kOhm
-  temp_high_t: 91.4°F
-
-  # Increase temp_interval_filter to send slower, aggregated updates to HA
-  temp_interval: 15s
-  temp_interval_filter: 4
-  cal_interval_filter: ${temp_interval_filter}
 
   # Names and icons for HA
   fan_name: "Fan"
@@ -47,6 +57,7 @@ substitutions:
 packages:
   nvm: !include zi3-nvm.yaml
   board: !include zi3-board-s3-zero.yaml
+  pinpower: ${ temp_power if not temp_disabled else {} }
 
 # Deal with the slightly insane initial state dynamics of binary_sensor
 # These will be reset to their true values with the next motor UART message
@@ -98,14 +109,10 @@ switch:
     lambda: return (id(thermostat_sense).state);
     turn_on_action:
       then:
-        - script.execute:
-            id: set_thermostat
-            thermostat_on: True
+        - script.execute: {id: set_thermostat, thermostat_on: True}
     turn_off_action:
       then:
-        - script.execute:
-            id: set_thermostat
-            thermostat_on: False
+        - script.execute: {id: set_thermostat, thermostat_on: False}
 
 # Publish the sensed fan state
 # Used internally for state feedback but mostly disabled in HA by default
@@ -147,7 +154,7 @@ sensor:
     id: ntc_voltage
     pin: GPIO02
     attenuation: auto
-    update_interval: ${temp_interval}
+    update_interval: never
     internal: True
   - platform: resistance
     id: ntc_resistance
@@ -157,33 +164,47 @@ sensor:
     internal: True
   - platform: copy
     id: calibration_resistance
+    internal: ${temp_disabled}
     source_id: ntc_resistance
     name: ${calibraiton_name}
     icon: ${calibraiton_icon}
     entity_category: diagnostic
     disabled_by_default: True
-    unit_of_measurement: "kOhmΩ"
+    unit_of_measurement: "kΩ"
     accuracy_decimals: 1
     filters:
       - multiply: 0.001
       - sliding_window_moving_average:
-          window_size: ${temp_interval_filter}
-          send_every: ${temp_interval_filter}
+          window_size: ${temp_samples}
+          send_every: ${temp_samples}
+          send_first_at: ${temp_samples}
   - platform: ntc
     id: temperature
+    internal: ${temp_disabled}
     name: ${temp_name}
     icon: ${temp_icon}
     sensor: ntc_resistance
     unit_of_measurement: "°C"
     accuracy_decimals: 1
     calibration:
-      - ${temp_low_r} -> ${temp_low_t}
-      - ${temp_mid_r} -> ${temp_mid_t}
-      - ${temp_high_r} -> ${temp_high_t}
+      - ${temp_cal_low}
+      - ${temp_cal_mid}
+      - ${temp_cal_high}
     filters:
       - sliding_window_moving_average:
-          window_size: ${temp_interval_filter}
-          send_every: ${temp_interval_filter}
+          window_size: ${temp_samples}
+          send_every: ${temp_samples}
+          send_first_at: ${temp_samples}
+
+# Probe the temperature frequently, but don't waste power
+interval:
+  - interval: ${temp_interval}
+    then:
+      - switch.turn_on: ntc_power_switch
+      - delay: ${temp_settle}
+      - component.update: ntc_voltage
+      - delay: ${temp_settle}
+      - switch.turn_off: ntc_power_switch
 
 # Conditional clicking we need to send IR commands
 script:
@@ -519,8 +540,8 @@ uart:
           unsigned long now = millis();
           {
             int secs = now / ${diag_resolution};
-            if (id(last_uart).state != secs) {
-              id(last_uart).publish_state(secs);
+            if (id(uart_count).state != secs) {
+              id(uart_count).publish_state(secs);
             }
           }
 
