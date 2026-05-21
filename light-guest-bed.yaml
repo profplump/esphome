@@ -162,69 +162,30 @@ light:
       - strobe:
       - pulse:
 
-# LEDs and their scalers
 output:
+  # Main lamp
   - platform: ledc
-    id: cool_white_led
-    pin:
-      number: GPIO14
-  - platform: template
-    type: float
     id: cool_white_lamp
-    write_action: 
-      then:
-        - output.set_level:
-            id: cool_white_led
-            level: !lambda |-
-              float k = (1.0f - ${cool_white_min}f) / 0.99f;
-              return (state > 0.0f) ? (k * state) + ${cool_white_min} : 0.0f;
-
+    pin: GPIO14
+    min_power: ${cool_white_min}
+    zero_means_zero: True
   - platform: ledc
-    id: warm_white_led
-    pin:
-      number: GPIO13
-  - platform: template
-    type: float
     id: warm_white_lamp
-    write_action: 
-      then:
-        - output.set_level:
-            id: warm_white_led
-            level: !lambda |-
-              float k = (1.0f - ${warm_white_min}f) / 0.99f;
-              return (state > 0.0f) ? (k * state) + ${warm_white_min} : 0.0f;
+    pin: GPIO13
+    min_power: ${warm_white_min}
+    zero_means_zero: True
 
+  # Timer-button LEDs
   - platform: ledc
-    id: blue_led
-    pin:
-      number: GPIO12
-      inverted: True
-  - platform: template
-    type: float
     id: blue_lamp
-    write_action: 
-      then:
-        - output.set_level:
-            id: blue_led
-            level: !lambda |-
-              float k = (1.0f - ${blue_min}f) / 0.99f;
-              return (state > 0.0f) ? (k * state) + ${blue_min} : 0.0f;
-
+    pin: {number: GPIO12, inverted: True}
+    min_power: ${blue_min}
+    zero_means_zero: True
   - platform: ledc
-    id: green_led
-    pin:
-      number: GPIO11
-      inverted: True
-  - platform: template
-    type: float
     id: green_lamp
-    write_action: 
-      then:
-        - output.set_level:
-            id: green_led
-            level: !lambda |-
-              float k = (1.0f - ${green_min}f) / 0.99f;
-              return (state > 0.0f) ? (k * state) + ${green_min} : 0.0f;
+    pin: {number: GPIO11, inverted: True}
+    min_power: ${green_min}
+    zero_means_zero: True
 
 sensor:
   # Average all active brightness sensors
