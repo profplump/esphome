@@ -4,6 +4,16 @@ substitutions:
   api_key: !secret api-light-bed
   ota_key: !secret ota-light-bed
   ap_key: !secret ap-light-bed
+
+  # Lamp defaults
+  lamp_min: 0.01
+  lamp_restore: RESTORE_DEFAULT_ON
+
+  # Names and icons for HA
+  lamp_name: "Lamp"
+  lamp_icon: mdi:spotlight-beam
+  touch_name: "Touch"
+  touch_icon: mdi:gesture-tap
   builtin_rgb_name: "Nightlight"
   builtin_rgb_icon: mdi:lightbulb-night
 
@@ -48,8 +58,9 @@ esp32_touch:
 output:
   - platform: ledc
     id: lamp_led
-    pin:
-      number: GPIO01
+    pin: GPIO01
+    min_power: ${lamp_min}
+    zero_means_zero: True
 
 light:
   # Override internal RGB to always be random
@@ -64,10 +75,10 @@ light:
   # Main lamp
   - platform: monochromatic
     id: lamp
-    name: Lamp
-    icon: mdi:spotlight-beam
+    name: ${lamp_name}
+    icon: ${lamp_icon}
     output: lamp_led
-    restore_mode: ALWAYS_OFF
+    restore_mode: ${lamp_restore}
     default_transition_length: 333ms
     effects:
       - random:
@@ -78,8 +89,8 @@ light:
 binary_sensor:
   - platform: esp32_touch
     id: touch
-    name: Touch
-    icon: mdi:gesture-tap
+    name: ${touch_name}
+    icon: ${touch_icon}
     pin: GPIO02
     threshold: 10000
     on_multi_click:
@@ -88,14 +99,14 @@ binary_sensor:
         - ON for at most 500ms
         - OFF for at least 50ms
       then:
-        - logger.log: "Touch - Toggle"
+        - logger.log: "${touch_name} - Toggle"
         - light.toggle: lamp
     # Full brightness on long press
     - timing:
         - ON for 500ms to 1000ms
         - OFF for at least 50ms
       then:
-        - logger.log: "Touch - Bright"
+        - logger.log: "${touch_name} - Bright"
         - light.control:
             id: lamp
             state: ON
@@ -104,7 +115,7 @@ binary_sensor:
     - timing:
         - ON for at least 1000ms
       then:
-        - logger.log: "Touch - Dim"
+        - logger.log: "${touch_name} - Dim"
         # Disable current effect for better feedback while dimming
         - globals.set:
             id: last_effect
