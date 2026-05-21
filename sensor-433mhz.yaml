@@ -1,9 +1,9 @@
 substitutions:
-  name: esp32-rf-sonoff
-  friendly_name: RF - Sonoff
-  api_key: !secret api-rf-sonoff
-  ota_key: !secret ota-rf-sonoff
-  ap_key: !secret ap-rf-sonoff
+  name: esp8285-sensor-433mhz
+  friendly_name: "Sensor - 433MHz"
+  api_key: !secret api-sensor-433mhz
+  ota_key: !secret ota-sensor-433mhz
+  ap_key: !secret ap-sensor-433mhz
 
 packages:
   base: !include zi3-base.yaml
@@ -25,9 +25,7 @@ remote_transmitter:
 
 # Status LED
 status_led:
-  pin:
-    number: GPIO13
-    inverted: True
+  pin: {number: GPIO13, inverted: True}
 
 # Logo LED (green)
 output:
