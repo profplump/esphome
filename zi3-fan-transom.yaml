@@ -143,10 +143,11 @@ sensor:
     entity_category: diagnostic
     disabled_by_default: True
   - platform: template
-    id: last_uart
-    name: "Last UART"
+    id: uart_count
+    name: "UART Count"
     icon: mdi:wrench-clock
     entity_category: diagnostic
+    accuracy_decimals: 0
     disabled_by_default: True
 
   # NTC temperature sensor
@@ -421,9 +422,7 @@ remote_receiver:
 uart:
   id: uart_motor
   baud_rate: 4800
-  rx_pin:
-    number: GPIO06
-    inverted: False
+  rx_pin: {number: GPIO06, inverted: False}
   debug:
     direction: BOTH
     dummy_receiver: True
@@ -432,11 +431,7 @@ uart:
       timeout: 10ms
       # Different revisions of this fan use different UART message formats
       # They are all delimited with the sequence 0x98 0x98 0x1E 0x1E
-      delimiter:
-        - 152
-        - 152
-        - 30
-        - 30
+      delimiter: [ 152, 152, 30, 30 ]
     sequence:
       - lambda: |-
           bool err = true;
@@ -446,7 +441,8 @@ uart:
             bytes.size() == 13 &&
             bytes[0] == 0x00 && bytes[3] == 0x18 &&
             bytes[5] == 0x18 && bytes[6] == 0x18 &&
-            bytes[7] == 0x1E && bytes[8] == 0x18 &&
+            bytes[7] == 0x1E &&
+            (bytes[8] == 0x18 || bytes[8] == 0x98) &&
             bytes[9] == 0x98 && bytes[10] == 0x98 &&
             bytes[11] == 0x1E && bytes[12] == 0x1E
           ) {
