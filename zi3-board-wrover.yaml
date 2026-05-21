@@ -3,6 +3,10 @@ substitutions:
 
 esp32:
   board: ${wrover_board}
+  framework:
+    advanced:
+      sram1_as_iram: True
+      minimum_chip_revision: "3.1"
 
 packages:
   esp32: !include zi3-board-esp32.yaml
